@@ -159,6 +159,8 @@ class OrthoBank:
             A = m.lora_A[adapter_name].weight
             B = m.lora_B[adapter_name].weight
             if A.numel() == 0 or B.numel() == 0: continue
+            if torch.norm(B) < 1e-6:
+                continue
             QA_curr, _ = torch.linalg.qr(A.T, mode="reduced")  
             QB_curr, _ = torch.linalg.qr(B,   mode="reduced")  
             for (QA_prev, QB_prev) in self.bank.get(id(m), []):
