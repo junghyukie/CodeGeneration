@@ -60,6 +60,34 @@ class T5Dataset:
             "CodeSearchNet": "Summarize the following ruby code into clear, concise English. Return only one sentence (no code, no quotes): ",
             "BFP": "Refactor or improve the following Java code: ",
         }
+        # Task-specific max lengths
+        self.max_input_length = {
+            'CodeTrans': 320,
+            'CodeSearchNet': 256,
+            'BFP': 130,
+            'CONCODE': 320
+        }
+        self.max_target_length = {
+            'CodeTrans': 256,
+            'CodeSearchNet': 128,
+            'BFP': 120,
+            'CONCODE': 150
+        }
+
+    @staticmethod
+    def _extract_first_paragraph(docstring: str) -> str:
+        """Extract the first paragraph from a docstring (CodeSearchNet preprocessing).
+        Following CodeXGLUE: 'The data consists of the first paragraph of each documentation.'
+        """
+        s = str(docstring).strip()
+        if not s:
+            return s
+        # Split on blank lines (double newline) to get paragraphs
+        paragraphs = re.split(r'\n\s*\n', s)
+        first = paragraphs[0].strip()
+        # Clean up: collapse internal newlines and extra whitespace
+        first = re.sub(r'\s+', ' ', first)
+        return first.strip()
 
     def select_subset_ds(self, ds, k=2000, seed=0):
         np.random.seed(seed)
@@ -67,18 +95,27 @@ class T5Dataset:
         idx_total = np.random.choice(np.arange(ds.shape[0]), num_samples, replace=False)
         return ds.select(idx_total)
 
-    def _preprocess_batch(self, examples, task: str, max_length: int = 512):
+    def _preprocess_batch(self, examples, task: str, max_length: int = 512, max_target_length: int = 128):
         if task not in self.task_list:
             raise ValueError(f"Unknown task name: {task}")
         tk = self.tokenizer
         text_col = self.text_key[task]
         label_col = self.label_key[task]
         instr = self.task_instructions[task]
+        
+        # Use task-specific max lengths if not overridden
+        input_max_len = self.max_input_length.get(task, max_length)
+        target_max_len = self.max_target_length.get(task, max_target_length)
+        
         src_texts = [(instr + str(t)).strip() for t in examples[text_col]]
         tgt_texts = [str(t) for t in examples[label_col]]
-        src = tk(src_texts, padding="max_length", truncation=True, max_length=max_length)
+        
+        # CodeSearchNet: extract first paragraph from docstring
+        if task == "CodeSearchNet":
+            tgt_texts = [self._extract_first_paragraph(t) for t in tgt_texts]
+        src = tk(src_texts, padding="max_length", truncation=True, max_length=input_max_len)
         with tk.as_target_tokenizer():
-            tgt = tk(tgt_texts, padding="max_length", truncation=True, max_length=max_length)
+            tgt = tk(tgt_texts, padding="max_length", truncation=True, max_length=target_max_len)
         labels = []
         for ids, mask in zip(tgt["input_ids"], tgt["attention_mask"]):
             labels.append([tok if m == 1 else -100 for tok, m in zip(ids, mask)])
@@ -122,24 +159,24 @@ class TrainConfig:
     lora_dir_path: str
     model_name: str = "Salesforce/codet5-small"
     batch_size: int = 16
-    seq_len: int = 512
-    target_seq_len: int = 64
+    seq_len: int = 256
+    target_seq_len: int = 128
     training_size: int = -1
-    val_size: int = 100
-    lr: float = 5e-5
+    val_size: int = -1
+    lr: float = 5e-4
     warmup_ratio: float = 0.1
     weight_decay: float = 0
-    epochs: int = 4
+    epochs: int = 5
     num_beams: int = 5
     repetition_penalty: float = 1.2
     generator_early_stopping: bool = True
     device: Optional[str] = None
     output_dir_prefix: str = "outputs"
     shared_adapter_name: str = "lora_shared"
-    r: int = 32
+    r: int = 16
     lora_alpha: int = 32
     lora_dropout: float = 0.1
-    target_modules: Tuple[str, ...] = ("q", "v", "k", "o", "wi", "wo")
+    target_modules: Tuple[str, ...] = ("q", "v", "k")
     bias: str = "none"
     eval_on_all_tasks: bool = True
     log_every_n_steps: int = 25
@@ -190,9 +227,24 @@ class T5ContinualLearner:
     def _build_all_dataloaders(self):
         data = {}
         for task in self.cfg.task_list:
-            train_dl = self.ds_helper.get_final_ds(task, "train", self.cfg.batch_size, k=self.cfg.training_size, max_length=self.cfg.seq_len)
-            val_dl, test_dl = self.ds_helper.get_final_ds(task, "test", self.cfg.batch_size, k=self.cfg.val_size, return_test=True, max_length=self.cfg.seq_len)
+            # Use task-specific max lengths
+            max_input = self.ds_helper.max_input_length.get(task, self.cfg.seq_len)
+            max_target = self.ds_helper.max_target_length.get(task, self.cfg.target_seq_len)
+            
+            train_dl = self.ds_helper.get_final_ds(
+                task, "train", self.cfg.batch_size, 
+                k=self.cfg.training_size, 
+                max_length=max_input
+            )
+            val_dl, test_dl = self.ds_helper.get_final_ds(
+                task, "test", self.cfg.batch_size, 
+                k=self.cfg.val_size, 
+                return_test=True, 
+                max_length=max_input
+            )
             data[task] = {"train": train_dl, "val": val_dl, "test": test_dl}
+            
+            self.logger.info(f"[DATA] {task}: max_input_len={max_input}, max_target_len={max_target}")
         return data
 
     @staticmethod
@@ -262,13 +314,17 @@ class T5ContinualLearner:
         self.model.eval()
         dl = self.tasks_data[task][split]
         preds, golds = [], []
+        
+        # Get task-specific target length for generation
+        max_new_tokens = self.ds_helper.max_target_length.get(task, self.cfg.target_seq_len)
+        
         for batch in dl:
             inp = batch["input_ids"].to(self.device)
             attn = batch["attention_mask"].to(self.device)
             gen = self.model.generate(
                 input_ids=inp,
                 attention_mask=attn,
-                max_new_tokens=self.cfg.target_seq_len,
+                max_new_tokens=max_new_tokens,
                 num_beams=self.cfg.num_beams,
                 do_sample=(self.cfg.num_beams == 1),
                 repetition_penalty=self.cfg.repetition_penalty,
@@ -390,11 +446,11 @@ if __name__ == "__main__":
     p.add_argument("--model_name", type=str, default="Salesforce/codet5-small")
     p.add_argument("--batch_size", type=int, default=16)
     p.add_argument("--seq_len", type=int, default=256)
-    p.add_argument("--target_seq_len", type=int, default=64)
+    p.add_argument("--target_seq_len", type=int, default=128)
     p.add_argument("--training_size", type=int, default=-1)
-    p.add_argument("--val_size", type=int, default=100)
-    p.add_argument("--epochs", type=int, default=4)
-    p.add_argument("--lr", type=float, default=5e-5)
+    p.add_argument("--val_size", type=int, default=-1)
+    p.add_argument("--epochs", type=int, default=5)
+    p.add_argument("--lr", type=float, default=5e-4)
     p.add_argument("--num_beams", type=int, default=5)
     p.add_argument("--repetition_penalty", type=float, default=1.2)
     p.add_argument("--device", type=str, default=None, choices=[None, "cuda", "cpu"])
