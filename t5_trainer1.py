@@ -7,7 +7,7 @@ import math
 import logging
 import collections
 from dataclasses import dataclass
-from typing import Dict, List, Tuple, Optional
+from typing import Any, Dict, List, Tuple, Optional
 import torch
 from torch.utils.data import DataLoader
 from transformers import (
@@ -51,43 +51,95 @@ def clear_directory(path: str):
 class T5Dataset:
     def __init__(self, tokenizer):
         self.tokenizer = tokenizer
-        self.task_list = ["CodeTrans", "CodeSearchNet", "BFP", "CONCODE"]
-        self.text_key = {"CONCODE": "nl", "CodeTrans": "java", "CodeSearchNet": "code", "BFP": "buggy"}
-        self.label_key = {"CONCODE": "code", "CodeTrans": "cs", "CodeSearchNet": "docstring", "BFP": "fixed"}
+        self.task_list = [
+            "CodeTrans", "CodeSearchNet", "BFP", "CONCODE",
+            "TheVault_Csharp", "KodCode", "RunBugRun", "CoST"
+        ]
+        self.text_key = {
+            "CONCODE": "nl",
+            "CodeTrans": "java",
+            "CodeSearchNet": "code",
+            "BFP": "buggy",
+            "TheVault_Csharp": "code",
+            "KodCode": "question",
+            "RunBugRun": "buggy_code",
+            "CoST": "lang1",
+        }
+        self.label_key = {
+            "CONCODE": "code",
+            "CodeTrans": "cs",
+            "CodeSearchNet": "docstring",
+            "BFP": "fixed",
+            "TheVault_Csharp": "docstring",
+            "KodCode": "solution",
+            "RunBugRun": "fixed_code",
+            "CoST": "lang2",
+        }
+
         self.task_instructions = {
             "CONCODE": "Generate Java code from the following English description: ",
             "CodeTrans": "Translate the following Java code into C#: ",
             "CodeSearchNet": "Summarize the following ruby code into clear, concise English. Return only one sentence (no code, no quotes): ",
             "BFP": "Refactor or improve the following Java code: ",
+            "TheVault_Csharp": "Summarize the following C# code into English: ",
+            "KodCode": "Generate Python code from the following description: ",
+            "RunBugRun": "Refactor or improve the following Ruby code: ",
+            "CoST": "Translate the following code from C++ to C#: ",
         }
-        # Task-specific max lengths
+
         self.max_input_length = {
-            'CodeTrans': 320,
-            'CodeSearchNet': 256,
-            'BFP': 130,
-            'CONCODE': 320
+            "CodeTrans": 320,
+            "CodeSearchNet": 256,
+            "BFP": 130,
+            "CONCODE": 320,
+            "TheVault_Csharp": 256,
+            "KodCode": 256,
+            "RunBugRun": 256,
+            "CoST": 256,
         }
         self.max_target_length = {
-            'CodeTrans': 256,
-            'CodeSearchNet': 128,
-            'BFP': 120,
-            'CONCODE': 150
+            "CodeTrans": 256,
+            "CodeSearchNet": 128,
+            "BFP": 120,
+            "CONCODE": 150,
+            "TheVault_Csharp": 128,  
+            "KodCode": 256,         
+            "RunBugRun": 256,        
+            "CoST": 256,
+        }
+
+        self.train_only_tasks = {
+            "KodCode": {"val": 1000, "test": 1000},
+            "RunBugRun": {"val": 972, "test": 1000},
         }
 
     @staticmethod
-    def _extract_first_paragraph(docstring: str) -> str:
-        """Extract the first paragraph from a docstring (CodeSearchNet preprocessing).
-        Following CodeXGLUE: 'The data consists of the first paragraph of each documentation.'
-        """
-        s = str(docstring).strip()
-        if not s:
-            return s
-        # Split on blank lines (double newline) to get paragraphs
-        paragraphs = re.split(r'\n\s*\n', s)
-        first = paragraphs[0].strip()
-        # Clean up: collapse internal newlines and extra whitespace
-        first = re.sub(r'\s+', ' ', first)
-        return first.strip()
+    def _extract_first_paragraph(docstring: Any) -> str:
+        if docstring is None:
+            return ""
+        if isinstance(docstring, (list, tuple)):
+            s = " ".join(str(t) for t in docstring)
+        else:
+            s = str(docstring)
+        s = s.replace("\n", "").replace("\r", "")
+        s = " ".join(s.strip().split())
+        return s
+
+    def _split_train_only(self, dataset, task, split, split_seed=42):
+        sizes = self.train_only_tasks[task]
+        test_size = sizes["test"]
+        val_size = sizes["val"]
+        tmp = dataset.train_test_split(test_size=test_size, seed=split_seed)
+        test_ds = tmp["test"]
+
+        tmp2 = tmp["train"].train_test_split(test_size=val_size, seed=split_seed)
+        train_ds = tmp2["train"]
+        val_ds = tmp2["test"]
+
+        mapping = {"train": train_ds, "validation": val_ds, "test": test_ds}
+        if split not in mapping:
+            raise ValueError(f"Unknown split '{split}' for train-only task '{task}'")
+        return mapping[split]
 
     def select_subset_ds(self, ds, k=2000, seed=0):
         np.random.seed(seed)
@@ -98,30 +150,31 @@ class T5Dataset:
     def _preprocess_batch(self, examples, task: str, max_length: int = 512, max_target_length: int = 128):
         if task not in self.task_list:
             raise ValueError(f"Unknown task name: {task}")
+
         tk = self.tokenizer
         text_col = self.text_key[task]
         label_col = self.label_key[task]
         instr = self.task_instructions[task]
-        
-        # Use task-specific max lengths if not overridden
+
         input_max_len = self.max_input_length.get(task, max_length)
         target_max_len = self.max_target_length.get(task, max_target_length)
-        
+
         src_texts = [(instr + str(t)).strip() for t in examples[text_col]]
         tgt_texts = [str(t) for t in examples[label_col]]
-        
-        # CodeSearchNet: extract first paragraph from docstring
+
         if task == "CodeSearchNet":
             tgt_texts = [self._extract_first_paragraph(t) for t in tgt_texts]
-        src = tk(src_texts, padding="max_length", truncation=True, max_length=input_max_len)
+        src = tk(src_texts, padding=True, truncation=True, max_length=input_max_len)
         with tk.as_target_tokenizer():
-            tgt = tk(tgt_texts, padding="max_length", truncation=True, max_length=target_max_len)
+            tgt = tk(tgt_texts, padding=True, truncation=True, max_length=target_max_len)
+
         labels = []
         for ids, mask in zip(tgt["input_ids"], tgt["attention_mask"]):
             labels.append([tok if m == 1 else -100 for tok, m in zip(ids, mask)])
+
         return {"input_ids": src["input_ids"], "attention_mask": src["attention_mask"], "labels": labels}
 
-    def get_final_ds(self, task, split, batch_size, k=-1, seed=0, return_test=False, max_length=512):
+    def get_final_ds(self, task, split, batch_size, k=-1, seed=0, max_length=512):
         if task == "CONCODE":
             dataset = load_dataset("AhmedSSoliman/CodeXGLUE-CONCODE", split=split)
         elif task == "CodeTrans":
@@ -130,28 +183,52 @@ class T5Dataset:
             dataset = load_dataset("semeru/code-text-ruby", split=split)
         elif task == "BFP":
             dataset = load_dataset("ayeshgk/code_x_glue_cc_code_refinement_annotated", split=split)
+
+        elif task == "TheVault_Csharp":
+            if split == "train":
+                dataset = load_dataset(
+                    "Fsoft-AIC/the-vault-function",
+                    cache_dir="/data/theVault",
+                    languages=["c_sharp"],
+                    split_set="train/small",
+                )
+            else:
+                dataset = load_dataset(
+                    "Fsoft-AIC/the-vault-function",
+                    cache_dir="/data/theVault",
+                    languages=["c_sharp"],
+                    split_set=split,
+                )
+
+        elif task == "KodCode":
+            dataset = load_dataset("KodCode/KodCode-V1-SFT-R1", split="train")
+
+        elif task == "RunBugRun":
+            dataset = load_dataset("ASSERT-KTH/RunBugRun-Final", split="train")
+            dataset = dataset.filter(lambda ex: ex.get("language", None) == "ruby")
+
+        elif task == "CoST":
+            dataset = load_dataset("dongg18/CoST", split=split)
+
         else:
             raise ValueError(f"Unknown task: {task}")
+
+        if task in self.train_only_tasks:
+            dataset = self._split_train_only(dataset, task, split, split_seed=42)
+
         if k != -1:
+            # Use max(requested size, actual size) so we keep the full dataset
+            # when actual size exceeds the requested subset size.
+            k = max(k, len(dataset))
             dataset = self.select_subset_ds(dataset, k=k, seed=seed)
         else:
             dataset = dataset.shuffle(seed=seed)
-        map_fn = lambda batch: self._preprocess_batch(batch, task, max_length=max_length)
-        if not return_test:
-            enc = dataset.map(map_fn, batched=True, remove_columns=dataset.column_names)
-            enc.set_format(type="torch", columns=["input_ids", "attention_mask", "labels"])
-            return DataLoader(enc, batch_size=batch_size, shuffle=True)
-        else:
-            N = len(dataset)
-            ds_val = dataset.select(range(0, N // 2))
-            ds_test = dataset.select(range(N // 2, N))
-            outs = []
-            for ds in (ds_val, ds_test):
-                enc = ds.map(map_fn, batched=True, remove_columns=ds.column_names)
-                enc.set_format(type="torch", columns=["input_ids", "attention_mask", "labels"])
-                outs.append(DataLoader(enc, batch_size=batch_size, shuffle=False))
-            return outs[0], outs[1]
 
+        map_fn = lambda batch: self._preprocess_batch(batch, task, max_length=max_length)
+
+        enc = dataset.map(map_fn, batched=True, remove_columns=dataset.column_names)
+        enc.set_format(type="torch", columns=["input_ids", "attention_mask", "labels"])
+        return DataLoader(enc, batch_size=batch_size, shuffle=(split == "train"))
 @dataclass
 class TrainConfig:
     task_list: List[str]
@@ -161,8 +238,9 @@ class TrainConfig:
     batch_size: int = 16
     seq_len: int = 256
     target_seq_len: int = 128
-    training_size: int = -1
+    training_size: int = 20000
     val_size: int = -1
+    test_size: int = -1
     lr: float = 5e-4
     warmup_ratio: float = 0.1
     weight_decay: float = 0
@@ -236,10 +314,14 @@ class T5ContinualLearner:
                 k=self.cfg.training_size, 
                 max_length=max_input
             )
-            val_dl, test_dl = self.ds_helper.get_final_ds(
-                task, "test", self.cfg.batch_size, 
+            val_dl = self.ds_helper.get_final_ds(
+                task, "validation", self.cfg.batch_size,
                 k=self.cfg.val_size, 
-                return_test=True, 
+                max_length=max_input
+            )
+            test_dl = self.ds_helper.get_final_ds(
+                task, "test", self.cfg.batch_size,
+                k=self.cfg.test_size,
                 max_length=max_input
             )
             data[task] = {"train": train_dl, "val": val_dl, "test": test_dl}
@@ -447,8 +529,9 @@ if __name__ == "__main__":
     p.add_argument("--batch_size", type=int, default=16)
     p.add_argument("--seq_len", type=int, default=256)
     p.add_argument("--target_seq_len", type=int, default=128)
-    p.add_argument("--training_size", type=int, default=-1)
-    p.add_argument("--val_size", type=int, default=-1)
+    p.add_argument("--training_size", type=int, default=100000)
+    p.add_argument("--val_size", type=int, default=5000)
+    p.add_argument("--test_size", type=int, default=5000)
     p.add_argument("--epochs", type=int, default=5)
     p.add_argument("--lr", type=float, default=5e-4)
     p.add_argument("--num_beams", type=int, default=5)
@@ -467,6 +550,7 @@ if __name__ == "__main__":
         target_seq_len=args.target_seq_len,
         training_size=args.training_size,
         val_size=args.val_size,
+        test_size=args.test_size,
         lr=args.lr,
         num_beams=args.num_beams,
         repetition_penalty=args.repetition_penalty,
