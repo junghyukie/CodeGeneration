@@ -2,6 +2,7 @@ from __future__ import annotations
 import numpy as np
 import os
 import gc
+import re
 import time
 import math
 import logging
@@ -17,8 +18,10 @@ from transformers import (
     get_linear_schedule_with_warmup,
 )
 from peft import LoraConfig
-from datasets import load_dataset
 from smoothbleu import compute_smooth_bleu
+
+from t5_data import T5Dataset
+
 
 def set_up_logger(log_filepath: str) -> logging.Logger:
     logger = logging.getLogger(os.path.basename(log_filepath) or "t5_trainer")
@@ -48,80 +51,12 @@ def clear_directory(path: str):
             pass
 
 
-class T5Dataset:
-    def __init__(self, tokenizer):
-        self.tokenizer = tokenizer
-        self.task_list = ["CodeTrans", "CodeSearchNet", "BFP", "CONCODE"]
-        self.text_key = {"CONCODE": "nl", "CodeTrans": "java", "CodeSearchNet": "code", "BFP": "buggy"}
-        self.label_key = {"CONCODE": "code", "CodeTrans": "cs", "CodeSearchNet": "docstring", "BFP": "fixed"}
-        self.task_instructions = {
-            "CONCODE": "Generate Java code from the following English description: ",
-            "CodeTrans": "Translate the following Java code into C#: ",
-            "CodeSearchNet": "Summarize: <lang=Ruby> <code> ",
-            "BFP": "Refactor or improve the following Java code: ",
-        }
-
-    def select_subset_ds(self, ds, k=2000, seed=0):
-        np.random.seed(seed)
-        num_samples = min(k, ds.shape[0])
-        idx_total = np.random.choice(np.arange(ds.shape[0]), num_samples, replace=False)
-        return ds.select(idx_total)
-
-    def _preprocess_batch(self, examples, task: str, max_length: int = 512):
-        if task not in self.task_list:
-            raise ValueError(f"Unknown task name: {task}")
-        tk = self.tokenizer
-        text_col = self.text_key[task]
-        label_col = self.label_key[task]
-        instr = self.task_instructions[task]
-        src_texts = [(instr + str(t)).strip() for t in examples[text_col]]
-        tgt_texts = [str(t) for t in examples[label_col]]
-        src = tk(src_texts, padding="max_length", truncation=True, max_length=max_length)
-        with tk.as_target_tokenizer():
-            tgt = tk(tgt_texts, padding="max_length", truncation=True, max_length=max_length)
-        labels = []
-        for ids, mask in zip(tgt["input_ids"], tgt["attention_mask"]):
-            labels.append([tok if m == 1 else -100 for tok, m in zip(ids, mask)])
-        return {"input_ids": src["input_ids"], "attention_mask": src["attention_mask"], "labels": labels}
-
-    def get_final_ds(self, task, split, batch_size, k=-1, seed=0, return_test=False, max_length=512):
-        if task == "CONCODE":
-            dataset = load_dataset("AhmedSSoliman/CodeXGLUE-CONCODE", split=split)
-        elif task == "CodeTrans":
-            dataset = load_dataset("CM/codexglue_codetrans", split=split)
-        elif task == "CodeSearchNet":
-            dataset = load_dataset("semeru/code-text-ruby", split=split)
-        elif task == "BFP":
-            dataset = load_dataset("ayeshgk/code_x_glue_cc_code_refinement_annotated", split=split)
-        else:
-            raise ValueError(f"Unknown task: {task}")
-        if k != -1:
-            dataset = self.select_subset_ds(dataset, k=k, seed=seed)
-        else:
-            dataset = dataset.shuffle(seed=seed)
-        map_fn = lambda batch: self._preprocess_batch(batch, task, max_length=max_length)
-        if not return_test:
-            enc = dataset.map(map_fn, batched=True, remove_columns=dataset.column_names)
-            enc.set_format(type="torch", columns=["input_ids", "attention_mask", "labels"])
-            return DataLoader(enc, batch_size=batch_size, shuffle=True)
-        else:
-            N = len(dataset)
-            ds_val = dataset.select(range(0, N // 2))
-            ds_test = dataset.select(range(N // 2, N))
-            outs = []
-            for ds in (ds_val, ds_test):
-                enc = ds.map(map_fn, batched=True, remove_columns=ds.column_names)
-                enc.set_format(type="torch", columns=["input_ids", "attention_mask", "labels"])
-                outs.append(DataLoader(enc, batch_size=batch_size, shuffle=False))
-            return outs[0], outs[1]
-
-
 @dataclass
 class TrainConfig:
     task_list: List[str]
     log_filepath: str
     lora_dir_path: str
-    model_name: str = "Salesforce/codet5-small"
+    model_name: str = "Salesforce/codet5-large"
     batch_size: int = 16
     seq_len: int = 256
     target_seq_len: int = 256
@@ -196,9 +131,23 @@ class T5ContinualLearner:
     def _build_all_dataloaders(self):
         data = {}
         for task in self.cfg.task_list:
-            train_dl = self.ds_helper.get_final_ds(task, "train", self.cfg.batch_size, k=self.cfg.training_size, max_length=self.cfg.seq_len)
-            val_dl, test_dl = self.ds_helper.get_final_ds(task, "test", self.cfg.batch_size, k=self.cfg.val_size, return_test=True, max_length=self.cfg.seq_len)
+            # Use task-specific max lengths
+            max_input = self.ds_helper.max_input_length.get(task, self.cfg.seq_len)
+            max_target = self.ds_helper.max_target_length.get(task, self.cfg.target_seq_len)
+            
+            train_dl = self.ds_helper.get_final_ds(
+                task, "train", self.cfg.batch_size,
+                k=self.cfg.training_size,
+                max_length=max_input
+            )
+            val_dl, test_dl = self.ds_helper.get_final_ds(
+                task, "test", self.cfg.batch_size,
+                k=self.cfg.val_size,
+                return_test=True,
+                max_length=max_input
+            )
             data[task] = {"train": train_dl, "val": val_dl, "test": test_dl}
+            self.logger.info(f"[DATA] {task}: max_input_len={max_input}, max_target_len={max_target}")
         return data
 
     def _ewc_named_params(self):
@@ -343,13 +292,17 @@ class T5ContinualLearner:
         self.model.eval()
         dl = self.tasks_data[task][split]
         preds, golds = [], []
+        
+        # Get task-specific target length for generation
+        max_new_tokens = self.ds_helper.max_target_length.get(task, self.cfg.target_seq_len)
+        
         for batch in dl:
             inp = batch["input_ids"].to(self.device)
             attn = batch["attention_mask"].to(self.device)
             gen = self.model.generate(
                 input_ids=inp,
                 attention_mask=attn,
-                max_new_tokens=self.cfg.target_seq_len,
+                max_new_tokens=max_new_tokens,
                 num_beams=self.cfg.num_beams,
                 do_sample=(self.cfg.num_beams == 1),
                 repetition_penalty=self.cfg.repetition_penalty,
