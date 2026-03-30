@@ -6,20 +6,29 @@ import time
 import math
 import logging
 import collections
+import hashlib
 from dataclasses import dataclass
 from typing import Any, Dict, List, Tuple, Optional
 import torch
 from torch.utils.data import DataLoader
+from torch.nn.utils.rnn import pad_sequence
 from transformers import (
     T5ForConditionalGeneration,
     AutoTokenizer,
     get_linear_schedule_with_warmup,
 )
 from peft import LoraConfig
-from datasets import load_dataset
+from datasets import load_dataset, concatenate_datasets
 import sys
 import re
 from smoothbleu import compute_smooth_bleu
+from task_info import (
+    TASK_LIST,
+    TASK_SPECS,
+    INSTRUCTION_POOL,
+    TRAIN_ONLY_TASKS,
+    INSTRUCTION_SPLIT_POLICY,
+)
 
 
 def set_up_logger(log_filepath: str) -> logging.Logger:
@@ -51,41 +60,9 @@ def clear_directory(path: str):
 class T5Dataset:
     def __init__(self, tokenizer):
         self.tokenizer = tokenizer
-        self.task_list = [
-            "CodeTrans", "CodeSearchNet", "BFP", "CONCODE",
-            "TheVault_Csharp", "KodCode", "RunBugRun", "CoST"
-        ]
-        self.text_key = {
-            "CONCODE": "nl",
-            "CodeTrans": "java",
-            "CodeSearchNet": "code",
-            "BFP": "buggy",
-            "TheVault_Csharp": "code",
-            "KodCode": "question",
-            "RunBugRun": "buggy_code",
-            "CoST": "lang1",
-        }
-        self.label_key = {
-            "CONCODE": "code",
-            "CodeTrans": "cs",
-            "CodeSearchNet": "docstring",
-            "BFP": "fixed",
-            "TheVault_Csharp": "docstring",
-            "KodCode": "solution",
-            "RunBugRun": "fixed_code",
-            "CoST": "lang2",
-        }
-
-        self.task_instructions = {
-            "CONCODE": "Generate Java code from the following English description: ",
-            "CodeTrans": "Translate the following Java code into C#: ",
-            "CodeSearchNet": "Summarize the following ruby code into clear, concise English. Return only one sentence (no code, no quotes): ",
-            "BFP": "Refactor or improve the following Java code: ",
-            "TheVault_Csharp": "Summarize the following C# code into English: ",
-            "KodCode": "Generate Python code from the following description: ",
-            "RunBugRun": "Refactor or improve the following Ruby code: ",
-            "CoST": "Translate the following code from C++ to C#: ",
-        }
+        self.task_list = list(TASK_LIST)
+        self.text_key = {task: TASK_SPECS[task]["text_key"] for task in self.task_list}
+        self.label_key = {task: TASK_SPECS[task]["label_key"] for task in self.task_list}
 
         self.max_input_length = {
             "CodeTrans": 320,
@@ -108,10 +85,7 @@ class T5Dataset:
             "CoST": 256,
         }
 
-        self.train_only_tasks = {
-            "KodCode": {"val": 1000, "test": 1000},
-            "RunBugRun": {"val": 972, "test": 1000},
-        }
+        self.train_only_tasks = dict(TRAIN_ONLY_TASKS)
 
     @staticmethod
     def _extract_first_paragraph(docstring: Any) -> str:
@@ -124,6 +98,49 @@ class T5Dataset:
         s = s.replace("\n", "").replace("\r", "")
         s = " ".join(s.strip().split())
         return s
+
+    @staticmethod
+    def _to_string(value: Any) -> str:
+        if value is None:
+            return ""
+        return str(value)
+
+    def _get_candidate_instruction_pool(self, task: str, split_name: str) -> List[str]:
+        task_type = TASK_SPECS[task]["task_type"]
+        pool = INSTRUCTION_POOL.get(task_type, [])
+        if not pool:
+            raise ValueError(f"No instruction templates defined for task_type '{task_type}'")
+
+        policy = INSTRUCTION_SPLIT_POLICY.get(split_name, INSTRUCTION_SPLIT_POLICY["train"])
+        if policy["pool_scope"] == "full":
+            return pool
+
+        if policy["pool_scope"] == "head_fraction":
+            fraction = float(policy.get("fraction", 0.75))
+            if fraction <= 0:
+                raise ValueError(f"Invalid fraction {fraction} for split '{split_name}'")
+            head_size = max(1, int(len(pool) * fraction))
+            return pool[:head_size]
+
+        raise ValueError(f"Unknown pool_scope '{policy['pool_scope']}' for split '{split_name}'")
+
+    def _select_instruction_template(self, task: str, sample_key: str, split_name: str, split_seed: int) -> str:
+        candidate_pool = self._get_candidate_instruction_pool(task, split_name)
+        random_key = f"{split_seed}::{split_name}::{sample_key}"
+        idx = int(hashlib.md5(random_key.encode("utf-8")).hexdigest(), 16) % len(candidate_pool)
+        return candidate_pool[idx]
+
+    def _render_instruction(self, task: str, raw_input: str, sample_key: str, split_name: str, split_seed: int) -> str:
+        spec = TASK_SPECS[task]
+        template = self._select_instruction_template(task, sample_key, split_name, split_seed)
+        format_values: Dict[str, str] = {
+            "language": spec.get("language", "code"),
+            "description": raw_input,
+            "code": raw_input,
+            "source_lang": spec.get("source_lang", spec.get("language", "source language")),
+            "target_lang": spec.get("target_lang", "target language"),
+        }
+        return template.format(**format_values)
 
     def _split_train_only(self, dataset, task, split, split_seed=42):
         sizes = self.train_only_tasks[task]
@@ -143,36 +160,109 @@ class T5Dataset:
 
     def select_subset_ds(self, ds, k=2000, seed=0):
         np.random.seed(seed)
-        num_samples = min(k, ds.shape[0])
-        idx_total = np.random.choice(np.arange(ds.shape[0]), num_samples, replace=False)
+        total = len(ds)
+        if total == 0:
+            return ds
+        num_samples = min(k, total)
+        idx_total = np.random.choice(np.arange(total), num_samples, replace=False)
         return ds.select(idx_total)
 
-    def _preprocess_batch(self, examples, task: str, max_length: int = 512, max_target_length: int = 128):
+    def _normalize_to_split_dataset(self, dataset, split: str):
+        # Fast path: already a concrete Dataset.
+        if hasattr(dataset, "select") and hasattr(dataset, "map"):
+            return dataset
+
+        if hasattr(dataset, "keys") and hasattr(dataset, "__getitem__"):
+            keys = list(dataset.keys())
+            if split in keys:
+                return dataset[split]
+
+            aliases = {
+                "train": ["train", "train/small", "train_small", "training"],
+                "validation": ["validation", "val", "dev"],
+                "test": ["test", "eval", "evaluation"],
+            }
+            for key in aliases.get(split, []):
+                if key in keys:
+                    return dataset[key]
+
+            # Merge split shards such as train/*, validation/*, test/*.
+            shard_prefix = f"{split}/"
+            shard_keys = [k for k in keys if k.startswith(shard_prefix)]
+            if shard_keys:
+                shard_datasets = [dataset[k] for k in sorted(shard_keys)]
+                return concatenate_datasets(shard_datasets)
+
+            if len(keys) == 1:
+                return dataset[keys[0]]
+
+            raise ValueError(f"Unable to resolve split '{split}' from dataset splits: {keys}")
+
+        raise TypeError(f"Unsupported dataset type: {type(dataset)}")
+
+    def _preprocess_batch(
+        self,
+        examples,
+        task: str,
+        max_length: int = 512,
+        max_target_length: int = 128,
+        split_name: str = "train",
+        split_seed: int = 42,
+    ):
         if task not in self.task_list:
             raise ValueError(f"Unknown task name: {task}")
 
         tk = self.tokenizer
         text_col = self.text_key[task]
         label_col = self.label_key[task]
-        instr = self.task_instructions[task]
 
         input_max_len = self.max_input_length.get(task, max_length)
         target_max_len = self.max_target_length.get(task, max_target_length)
 
-        src_texts = [(instr + str(t)).strip() for t in examples[text_col]]
-        tgt_texts = [str(t) for t in examples[label_col]]
+        raw_inputs = [self._to_string(t) for t in examples[text_col]]
+        src_texts = []
+        for raw_input in raw_inputs:
+            sample_uid = hashlib.md5((task + "||" + raw_input).encode("utf-8")).hexdigest()
+            instruction = self._render_instruction(
+                task=task,
+                raw_input=raw_input,
+                sample_key=f"{task}::{sample_uid}",
+                split_name=split_name,
+                split_seed=split_seed,
+            )
+            src_texts.append(instruction + " </s>")
+
+        tgt_texts = [self._to_string(t) for t in examples[label_col]]
 
         if task == "CodeSearchNet":
             tgt_texts = [self._extract_first_paragraph(t) for t in tgt_texts]
-        src = tk(src_texts, padding=True, truncation=True, max_length=input_max_len)
+        tgt_texts = [t + " </s>" for t in tgt_texts]
+        # Defer padding to DataLoader collate so each batch is padded consistently.
+        src = tk(src_texts, padding=False, truncation=True, max_length=input_max_len)
         with tk.as_target_tokenizer():
-            tgt = tk(tgt_texts, padding=True, truncation=True, max_length=target_max_len)
+            tgt = tk(tgt_texts, padding=False, truncation=True, max_length=target_max_len)
 
         labels = []
         for ids, mask in zip(tgt["input_ids"], tgt["attention_mask"]):
             labels.append([tok if m == 1 else -100 for tok, m in zip(ids, mask)])
 
         return {"input_ids": src["input_ids"], "attention_mask": src["attention_mask"], "labels": labels}
+
+    def _collate_batch(self, examples: List[Dict[str, Any]]) -> Dict[str, torch.Tensor]:
+        input_features = [
+            {"input_ids": ex["input_ids"], "attention_mask": ex["attention_mask"]}
+            for ex in examples
+        ]
+        batch = self.tokenizer.pad(input_features, padding=True, return_tensors="pt")
+
+        label_tensors = []
+        for ex in examples:
+            labels = ex["labels"]
+            if not isinstance(labels, torch.Tensor):
+                labels = torch.tensor(labels, dtype=torch.long)
+            label_tensors.append(labels)
+        batch["labels"] = pad_sequence(label_tensors, batch_first=True, padding_value=-100)
+        return batch
 
     def get_final_ds(self, task, split, batch_size, k=-1, seed=0, max_length=512):
         if task == "CONCODE":
@@ -188,16 +278,16 @@ class T5Dataset:
             if split == "train":
                 dataset = load_dataset(
                     "Fsoft-AIC/the-vault-function",
-                    cache_dir="/data/theVault",
+                    cache_dir="dataset/theVault",
                     languages=["c_sharp"],
-                    split_set="train/small",
+                    split_set=["train/small"],
                 )
             else:
                 dataset = load_dataset(
                     "Fsoft-AIC/the-vault-function",
-                    cache_dir="/data/theVault",
+                    cache_dir="dataset/theVault",
                     languages=["c_sharp"],
-                    split_set=split,
+                    split_set=[split],
                 )
 
         elif task == "KodCode":
@@ -213,22 +303,34 @@ class T5Dataset:
         else:
             raise ValueError(f"Unknown task: {task}")
 
+        dataset = self._normalize_to_split_dataset(dataset, split)
+
         if task in self.train_only_tasks:
             dataset = self._split_train_only(dataset, task, split, split_seed=42)
 
         if k != -1:
-            # Use max(requested size, actual size) so we keep the full dataset
-            # when actual size exceeds the requested subset size.
-            k = max(k, len(dataset))
+            # Cap to at most k samples while staying within dataset bounds.
+            k = min(k, len(dataset))
             dataset = self.select_subset_ds(dataset, k=k, seed=seed)
         else:
             dataset = dataset.shuffle(seed=seed)
 
-        map_fn = lambda batch: self._preprocess_batch(batch, task, max_length=max_length)
+        map_fn = lambda batch: self._preprocess_batch(
+            batch,
+            task,
+            max_length=max_length,
+            split_name=split,
+            split_seed=seed,
+        )
 
         enc = dataset.map(map_fn, batched=True, remove_columns=dataset.column_names)
         enc.set_format(type="torch", columns=["input_ids", "attention_mask", "labels"])
-        return DataLoader(enc, batch_size=batch_size, shuffle=(split == "train"))
+        return DataLoader(
+            enc,
+            batch_size=batch_size,
+            shuffle=(split == "train"),
+            collate_fn=self._collate_batch,
+        )
 @dataclass
 class TrainConfig:
     task_list: List[str]
@@ -525,7 +627,7 @@ if __name__ == "__main__":
     p.add_argument("--task_list", nargs="+", required=True)
     p.add_argument("--log_filepath", type=str, required=True)
     p.add_argument("--lora_dir_path", type=str, default="lora")
-    p.add_argument("--model_name", type=str, default="Salesforce/codet5-small")
+    p.add_argument("--model_name", type=str, default="Salesforce/codet5p-770m")
     p.add_argument("--batch_size", type=int, default=16)
     p.add_argument("--seq_len", type=int, default=256)
     p.add_argument("--target_seq_len", type=int, default=128)
@@ -537,8 +639,9 @@ if __name__ == "__main__":
     p.add_argument("--num_beams", type=int, default=5)
     p.add_argument("--repetition_penalty", type=float, default=1.2)
     p.add_argument("--device", type=str, default=None, choices=[None, "cuda", "cpu"])
-    p.add_argument("--log_every_n_steps", type=int, default=25)
+    p.add_argument("--log_every_n_steps", type=int, default=100)
     p.add_argument("--eval_on_all_tasks", action="store_true")
+    p.add_argument("--shared_adapter_name", type=str, default="outputs")
     args = p.parse_args()
     cfg = TrainConfig(
         task_list=args.task_list,
@@ -557,6 +660,9 @@ if __name__ == "__main__":
         device=args.device,
         eval_on_all_tasks=args.eval_on_all_tasks,
         log_every_n_steps=args.log_every_n_steps,
+        epochs=args.epochs,
+        shared_adapter_name=args.shared_adapter_name,
+
     )
     learner = T5ContinualLearner(cfg)
     learner.train_continual()
