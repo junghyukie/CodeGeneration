@@ -144,23 +144,22 @@ class T5Dataset:
             dataset = load_dataset("ayeshgk/code_x_glue_cc_code_refinement_annotated", split=split)
 
         elif task == "TheVault_Csharp":
-            if split == "train":
-                dataset = load_dataset(
-                    "Fsoft-AIC/the-vault-function",
-                    cache_dir="/data/theVault",
-                    languages=["c_sharp"],
-                    split_set="train/small",
-                )
-            else:
-                dataset = load_dataset(
-                    "Fsoft-AIC/the-vault-function",
-                    cache_dir="/data/theVault",
-                    languages=["c_sharp"],
-                    split_set=split,
-                )
+            # NOTE: Only use the c_sharp subset and default to the smaller train split to avoid downloading everything.
+            split_set = "train/small" if split == "train" else split
+            dataset = load_dataset(
+                "Fsoft-AIC/the-vault-function",
+                languages=["c_sharp"],
+                split_set=split_set,
+            )
 
         elif task == "KodCode":
+            # NOTE: Load the dataset once (train-only) and keep only Python-related samples if a language column exists.
             dataset = load_dataset("KodCode/KodCode-V1-SFT-R1", split="train")
+            # Some versions expose a language/programming_language field; keep only Python to avoid unnecessary data.
+            for lang_key in ("language", "lang", "programming_language"):
+                if lang_key in dataset.column_names:
+                    dataset = dataset.filter(lambda ex, lk=lang_key: str(ex.get(lk, "")).lower() in {"python", "py"})
+                    break
 
         elif task == "RunBugRun":
             dataset = load_dataset("ASSERT-KTH/RunBugRun-Final", split="train")

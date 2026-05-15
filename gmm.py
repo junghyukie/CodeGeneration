@@ -16,7 +16,7 @@ from t5_data import T5Dataset
 
 @dataclass
 class RouterConfig:
-    model_name: str = "SalesForce/codet5-small"
+    model_name: str = "Qwen/Qwen2.5-Coder-1.5B"
     output_dir: str = "./router_gmm_ckpt"
 
     tasks: Tuple[str, ...] = (
@@ -26,7 +26,6 @@ class RouterConfig:
         "BFP",
         "KodCode",
         "RunBugRun",
-        "TheVault_Csharp",
     )
 
     feature_layers: int = 4
