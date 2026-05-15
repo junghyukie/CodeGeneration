@@ -122,9 +122,10 @@ class T5Dataset:
         if task == "CodeSearchNet":
             tgt_texts = [self._extract_first_paragraph(t) for t in tgt_texts]
 
-        src = tk(src_texts, padding=True, truncation=True, max_length=input_max_len)
+        # IMPORTANT: pad to fixed lengths so PyTorch DataLoader can stack tensors
+        src = tk(src_texts, padding="max_length", truncation=True, max_length=input_max_len)
         with tk.as_target_tokenizer():
-            tgt = tk(tgt_texts, padding=True, truncation=True, max_length=target_max_len)
+            tgt = tk(tgt_texts, padding="max_length", truncation=True, max_length=target_max_len)
 
         labels = []
         for ids, mask in zip(tgt["input_ids"], tgt["attention_mask"]):
