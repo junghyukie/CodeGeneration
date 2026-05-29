@@ -1,20 +1,11 @@
-#!/bin/bash
-export HF_HOME=./.cache
-export HF_DATASETS_CACHE=./.cache
-
-export CUDA_VISIBLE_DEVICES=1
-
-python t5_trainer1.py \
-  --task_list TheVault_Csharp\
-  --log_filepath logs/TheVault_Csharp.log\
-  --shared_adapter_name lora_TheVault_Csharp
-
-python t5_trainer1.py \
-  --task_list CoST\
-  --log_filepath logs/CoST.log\
-  --shared_adapter_name lora_CoST
-
-python t5_trainer1.py \
-  --task_list KodCode\
-  --log_filepath logs/KodCode.log\
-  --shared_adapter_name lora_KodCode
+python gmm.py \
+  --model_name Qwen/Qwen2.5-Coder-1.5B \
+  --output_dir ./router_gmm_ckpt \
+  --batch_size 16 \
+  --train_k 5000 \
+  --eval_k 1000 \
+  --routing_dim 128 \
+  --gmm_components 8 \
+  --feature_layers 4 \
+  --eval_split test \
+  --force_recompute_features

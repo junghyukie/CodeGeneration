@@ -9,15 +9,18 @@ from typing import Dict, Iterable, List, Optional, Tuple
 import torch
 import torch.nn.functional as F
 from tqdm import tqdm
-from transformers import AutoTokenizer, T5ForConditionalGeneration
+from datasets import Dataset, concatenate_datasets, load_dataset
+from transformers import AutoModel, AutoTokenizer
 from torch.utils.data import DataLoader
 from t5_data import T5Dataset
 
 
 @dataclass
 class RouterConfig:
-    model_name: str = "Qwen/Qwen2.5-Coder-1.5B"
+    model_name: str = "SalesForce/codet5-small"
     output_dir: str = "./router_gmm_ckpt"
+    dataset_source: str = "t5"
+    executable_dataset_name: str = "ankhanhtran02/CL4Code-executable-datasets"
 
     tasks: Tuple[str, ...] = (
         "CONCODE",
@@ -26,6 +29,7 @@ class RouterConfig:
         "BFP",
         "KodCode",
         "RunBugRun",
+        "TheVault_Csharp",
     )
 
     feature_layers: int = 4
@@ -116,7 +120,74 @@ def parse_tasks(raw: Optional[str], default: Tuple[str, ...]) -> Tuple[str, ...]
         return default
     return tuple(t.strip() for t in raw.split(",") if t.strip())
 
+
+def _load_split(dataset_name: str, split: str) -> Dataset:
+    return load_dataset(dataset_name, split=split)
+
+
+def _limit_dataset(dataset: Dataset, max_samples: int, seed: int = 0) -> Dataset:
+    if max_samples is None or max_samples == -1:
+        return dataset.shuffle(seed=seed)
+    max_samples = min(max_samples, len(dataset))
+    if max_samples < 0:
+        raise ValueError(f"max_samples must be -1 or non-negative, got {max_samples}")
+    return dataset.shuffle(seed=seed).select(range(max_samples))
+
+
+def _load_training_dataset(dataset_name: str, language: str, max_train_samples: int, seed: int = 0) -> Dataset:
+    split_datasets = []
+    for split in ["train_OSS_Instruct", "train_McEval_Instruct"]:
+        dataset = _load_split(dataset_name, split)
+        dataset = dataset.filter(
+            lambda row: row["language"] == language and row["solution"] is not None
+        )
+        split_datasets.append(dataset)
+
+    if not split_datasets:
+        raise ValueError("No training splits were loaded.")
+
+    train_dataset = split_datasets[0] if len(split_datasets) == 1 else concatenate_datasets(split_datasets)
+    train_dataset = _limit_dataset(train_dataset, max_train_samples, seed)
+    dataset = train_dataset.remove_columns([c for c in train_dataset.column_names if c not in ("instruction", "solution")])
+    dataset = dataset.rename_column("instruction", "prompt")
+    dataset = dataset.rename_column("solution", "answer")
+    if len(dataset) > 0:
+        print("[train] Sample:")
+        print(json.dumps(dataset[0], ensure_ascii=False, indent=2))
+    return dataset
+
+
+def _load_eval_dataset(dataset_name: str, language: str, max_eval_samples: int, seed: int = 0) -> Dataset:
+    dataset = _load_split(dataset_name, "test_McEval")
+    dataset = dataset.filter(
+        lambda row: row["language"] == language and row["test"] is not None
+    )
+    dataset = _limit_dataset(dataset, max_eval_samples, seed)
+    dataset = dataset.remove_columns([c for c in dataset.column_names if c not in ("instruction", "solution")])
+    dataset = dataset.rename_column("instruction", "prompt")
+    dataset = dataset.rename_column("solution", "answer")
+    if len(dataset) == 0:
+        raise ValueError(f"No evaluation samples found in split=test_McEval for language={language}.")
+    print("[eval] Sample:")
+    print(json.dumps(dataset[0], ensure_ascii=False, indent=2))
+    return dataset
+
+
+def create_executable_dataset(
+    dataset_name: str,
+    language: str,
+    seed: int,
+    num_train: int,
+    num_eval: int,
+    num_test: int,
+) -> Tuple[Dataset, Dataset, Dataset]:
+    train_dataset = _load_training_dataset(dataset_name, language, num_train, seed)
+    test_dataset = _load_eval_dataset(dataset_name, language, num_test, seed)
+    eval_dataset = _load_eval_dataset(dataset_name, language, num_eval, seed)
+    return train_dataset, eval_dataset, test_dataset
+
 class T5RoutingFeatureExtractor:
+    """Frozen T5 encoder feature extractor for routing."""
 
     def __init__(self, model_name: str, feature_layers: int, routing_dim: int, device: torch.device, seed: int):
         self.model_name = model_name
@@ -126,17 +197,26 @@ class T5RoutingFeatureExtractor:
         self.seed = seed
 
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.model = T5ForConditionalGeneration.from_pretrained(model_name)
+        if self.tokenizer.pad_token_id is None and self.tokenizer.eos_token is not None:
+            self.tokenizer.pad_token = self.tokenizer.eos_token
+        self.model = AutoModel.from_pretrained(model_name)
         self.model.to(device)
         self.model.eval()
 
         for p in self.model.parameters():
             p.requires_grad = False
 
-        hidden_size = self.model.config.d_model
+        hidden_size = getattr(self.model.config, "d_model", None)
+        if hidden_size is None:
+            hidden_size = getattr(self.model.config, "hidden_size", None)
+        if hidden_size is None:
+            raise ValueError(f"Cannot infer hidden size from model config for {model_name}")
+
+        # We concatenate [prefix pooled; full pooled], so the projection input dim doubles.
+        proj_in_dim = hidden_size * 2
         self.P = self._make_row_orthonormal_projection(
             p=routing_dim,
-            d=hidden_size,
+            d=proj_in_dim,
             seed=seed,
             device=device,
         )
@@ -165,20 +245,42 @@ class T5RoutingFeatureExtractor:
         input_ids = batch["input_ids"].to(self.device)
         attention_mask = batch["attention_mask"].to(self.device)
 
-        enc = self.model.encoder(
-            input_ids=input_ids,
-            attention_mask=attention_mask,
-            output_hidden_states=True,
-            return_dict=True,
-        )
+        if hasattr(self.model, "encoder"):
+            enc = self.model.encoder(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                output_hidden_states=True,
+                return_dict=True,
+            )
+        else:
+            enc = self.model(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                output_hidden_states=True,
+                return_dict=True,
+            )
 
+        # hidden_states[0] is embedding output; hidden_states[i] is after i encoder layers.
         layer_idx = min(self.feature_layers, len(enc.hidden_states) - 1)
         H = enc.hidden_states[layer_idx]  # [B, T, D]
 
-        mask = attention_mask.unsqueeze(-1).to(H.dtype)  # [B, T, 1]
-        denom = mask.sum(dim=1).clamp_min(1.0)
-        pooled = (H * mask).sum(dim=1) / denom  # [B, D]
+        def masked_mean_pool(x: torch.Tensor, mask_2d: torch.Tensor) -> torch.Tensor:
+            m = mask_2d.unsqueeze(-1).to(x.dtype)  # [B, T, 1]
+            denom = m.sum(dim=1).clamp_min(1.0)
+            return (x * m).sum(dim=1) / denom
 
+        # Prefix pooling: keep instruction/task prompt region (first 64 tokens)
+        prefix_len = min(64, H.shape[1])
+        H_prefix = H[:, :prefix_len, :]
+        m_prefix = attention_mask[:, :prefix_len]
+
+        h_prefix = masked_mean_pool(H_prefix, m_prefix)  # [B, D]
+        h_full = masked_mean_pool(H, attention_mask)     # [B, D]
+
+        # concat prefix pooled + full pooled
+        pooled = torch.cat([h_prefix, h_full], dim=-1)   # [B, 2D]
+
+        # LN without learned affine params, matching method-level LN usage.
         h = F.layer_norm(pooled.float(), normalized_shape=(pooled.shape[-1],))
         z = h @ self.P.T.float()  # [B, p]
         return z.detach().cpu()
@@ -443,34 +545,102 @@ def build_dataloader(dataset_builder: T5Dataset, task: str, split: str, batch_si
         ),
     )
 
-def feature_cache_path(output_dir: str | Path, task: str, split: str, k: int, feature_layers: int, routing_dim: int) -> Path:
+
+def build_executable_dataloader(
+    tokenizer,
+    dataset_name: str,
+    language: str,
+    split: str,
+    batch_size: int,
+    k: int,
+    seed: int,
+    max_length: int,
+):
+    if split == "train":
+        dataset = _load_training_dataset(dataset_name, language, k, seed)
+    elif split in {"validation", "eval"}:
+        dataset = _load_eval_dataset(dataset_name, language, k, seed)
+    elif split == "test":
+        dataset = _load_eval_dataset(dataset_name, language, k, seed)
+    else:
+        raise ValueError(f"Unknown executable split: {split}")
+
+    def preprocess_batch(examples):
+        src_texts = [str(t).strip() for t in examples["prompt"]]
+        return tokenizer(src_texts, padding="max_length", truncation=True, max_length=max_length)
+
+    enc = dataset.map(preprocess_batch, batched=True, remove_columns=dataset.column_names)
+    enc.set_format(type="torch", columns=["input_ids", "attention_mask"])
+
+    pad_token_id = tokenizer.pad_token_id
+    if pad_token_id is None:
+        pad_token_id = 0
+
+    return DataLoader(
+        enc,
+        batch_size=batch_size,
+        shuffle=(split == "train"),
+        collate_fn=lambda batch: t5_pad_collate(
+            batch,
+            pad_token_id=pad_token_id,
+            label_pad_id=-100,
+        ),
+    )
+
+
+def feature_cache_path(
+    output_dir: str | Path,
+    dataset_source: str,
+    task: str,
+    split: str,
+    k: int,
+    feature_layers: int,
+    routing_dim: int,
+) -> Path:
+    safe_source = dataset_source.replace("/", "_")
     safe_task = task.replace("/", "_")
-    return Path(output_dir) / "features" / f"{safe_task}_{split}_k{k}_L{feature_layers}_p{routing_dim}.pt"
+    return Path(output_dir) / "features" / f"{safe_source}_{safe_task}_{split}_k{k}_L{feature_layers}_p{routing_dim}.pt"
 
 
 def get_or_extract_features(
     extractor: T5RoutingFeatureExtractor,
-    dataset_builder: T5Dataset,
+    dataset_builder: Optional[T5Dataset],
     cfg: RouterConfig,
     task: str,
     split: str,
     k: int,
 ) -> torch.Tensor:
-    path = feature_cache_path(cfg.output_dir, task, split, k, cfg.feature_layers, cfg.routing_dim)
+    path = feature_cache_path(cfg.output_dir, cfg.dataset_source, task, split, k, cfg.feature_layers, cfg.routing_dim)
     ensure_dir(path.parent)
 
     if cfg.save_features and path.exists() and not cfg.force_recompute_features:
         return torch.load(path, map_location="cpu").float()
 
-    dl = build_dataloader(
-        dataset_builder=dataset_builder,
-        task=task,
-        split=split,
-        batch_size=cfg.batch_size,
-        k=k,
-        seed=cfg.seed,
-        max_length=cfg.max_length,
-    )
+    if cfg.dataset_source == "t5":
+        if dataset_builder is None:
+            raise ValueError("dataset_builder is required for dataset_source=t5")
+        dl = build_dataloader(
+            dataset_builder=dataset_builder,
+            task=task,
+            split=split,
+            batch_size=cfg.batch_size,
+            k=k,
+            seed=cfg.seed,
+            max_length=cfg.max_length,
+        )
+    elif cfg.dataset_source == "executable":
+        dl = build_executable_dataloader(
+            tokenizer=extractor.tokenizer,
+            dataset_name=cfg.executable_dataset_name,
+            language=task,
+            split=split,
+            batch_size=cfg.batch_size,
+            k=k,
+            seed=cfg.seed,
+            max_length=cfg.max_length,
+        )
+    else:
+        raise ValueError(f"Unknown dataset_source: {cfg.dataset_source}")
     z = extractor.extract_features(dl, desc=f"extract {task}/{split}")
 
     if cfg.save_features:
@@ -488,7 +658,7 @@ class EvalResult:
 def evaluate_seen_tasks(
     router: ResidualFitGMMRouter,
     extractor: T5RoutingFeatureExtractor,
-    dataset_builder: T5Dataset,
+    dataset_builder: Optional[T5Dataset],
     cfg: RouterConfig,
     seen_tasks: List[str],
     split: str,
@@ -553,6 +723,9 @@ def run(cfg: RouterConfig) -> None:
 
     device = get_device()
     print(f"[setup] device={device}")
+    print(f"[setup] dataset_source={cfg.dataset_source}")
+    if cfg.dataset_source == "executable":
+        print(f"[setup] executable_dataset_name={cfg.executable_dataset_name}")
     print(f"[setup] tasks={list(cfg.tasks)}")
 
     extractor = T5RoutingFeatureExtractor(
@@ -564,7 +737,7 @@ def run(cfg: RouterConfig) -> None:
     )
     extractor.save_projection(output_dir)
 
-    dataset_builder = T5Dataset(extractor.tokenizer)
+    dataset_builder = T5Dataset(extractor.tokenizer) if cfg.dataset_source == "t5" else None
     router = ResidualFitGMMRouter(cfg)
 
     all_results: Dict[str, Dict] = {}
@@ -613,7 +786,14 @@ def build_argparser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser()
     p.add_argument("--model_name", type=str, default=RouterConfig.model_name)
     p.add_argument("--output_dir", type=str, default=RouterConfig.output_dir)
-    p.add_argument("--tasks", type=str, default=None, help="Comma-separated task list. Default uses all T5Dataset tasks.")
+    p.add_argument("--dataset_source", type=str, default=RouterConfig.dataset_source, choices=["t5", "executable"])
+    p.add_argument("--executable_dataset_name", type=str, default=RouterConfig.executable_dataset_name)
+    p.add_argument(
+        "--tasks",
+        type=str,
+        default=None,
+        help="Comma-separated task list. For dataset_source=executable, tasks are language names.",
+    )
 
     p.add_argument("--feature_layers", type=int, default=RouterConfig.feature_layers)
     p.add_argument("--routing_dim", type=int, default=RouterConfig.routing_dim)
@@ -643,10 +823,13 @@ def build_argparser() -> argparse.ArgumentParser:
 def main() -> None:
     args = build_argparser().parse_args()
     default_cfg = RouterConfig()
+    default_tasks = default_cfg.tasks if args.dataset_source == "t5" else ("swift",)
     cfg = RouterConfig(
         model_name=args.model_name,
         output_dir=args.output_dir,
-        tasks=parse_tasks(args.tasks, default_cfg.tasks),
+        dataset_source=args.dataset_source,
+        executable_dataset_name=args.executable_dataset_name,
+        tasks=parse_tasks(args.tasks, default_tasks),
         feature_layers=args.feature_layers,
         routing_dim=args.routing_dim,
         max_length=args.max_length,
