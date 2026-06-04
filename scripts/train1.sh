@@ -4,10 +4,11 @@ python gmm.py \
   --dataset_source executable \
   --tasks python,cpp,swift,rust,csharp,java,php,typescript,shell \
   --batch_size 16 \
-  --train_k 1000 \
-  --eval_k 1000 \
+  --train_k -1 \
+  --eval_k -1 \
   --routing_dim 256 \
   --gmm_components 8 \
   --feature_layers 4 \
   --eval_split test \
-  --force_recompute_features
+  --force_recompute_features \
+  --max_length 1024 
