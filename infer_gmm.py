@@ -59,7 +59,7 @@ class RouterConfig:
         "KodCode", "RunBugRun", "TheVault_Csharp",
     )
     feature_layers: int = 4    # hidden-state index used for routing (after decoder layer 3)
-    routing_dim: int = 128
+    routing_dim: int = 256
     max_length: int = 512      # tokenisation max-length for routing
     batch_size: int = 16
     train_k: int = 2000

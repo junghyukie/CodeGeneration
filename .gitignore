@@ -1,4 +1,5 @@
 gmm_methodology.tex
-# method.pdf
+method.pdf
 infer_anyssr_total.py
 moe.py
+router_gmm_ckpt/

@@ -33,7 +33,7 @@ class RouterConfig:
     )
 
     feature_layers: int = 4
-    routing_dim: int = 128
+    routing_dim: int = 256
     max_length: int = 512
     batch_size: int = 16
     train_k: int = 2000

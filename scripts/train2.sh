@@ -4,8 +4,8 @@ python gmm.py \
   --batch_size 16 \
   --train_k 5000 \
   --eval_k 1000 \
-  --routing_dim 128 \
-  --gmm_components 8 \
+  --routing_dim 256 \
+  --gmm_components 4 \
   --feature_layers 4 \
   --eval_split test \
   --force_recompute_features

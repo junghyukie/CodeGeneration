@@ -7,7 +7,7 @@ python gmm.py \
   --train_k -1 \
   --eval_k -1 \
   --routing_dim 256 \
-  --gmm_components 8 \
+  --gmm_components 4 \
   --feature_layers 4 \
   --eval_split test \
   --force_recompute_features \
