@@ -178,16 +178,20 @@ def _disable_lora(model):
     This matches gmm.py's training behaviour where a fresh copy of the backbone
     (no LoRA) was used for feature extraction — ensuring train/inference consistency.
     """
+    # PEFT ≥0.6: disable_adapters() is a context manager (plural, no underscore suffix).
+    # Older PEFT used disable_adapter() or disable_adapter_layers() — try all variants.
+    for method in ("disable_adapters", "disable_adapter"):
+        ctx = getattr(model, method, None)
+        if ctx is not None:
+            with ctx():
+                yield
+            return
+    # Last-resort manual toggle
+    model.base_model.disable_adapter_layers()
     try:
-        with model.disable_adapter():
-            yield
-    except AttributeError:
-        # Fallback for older PEFT versions
-        model.base_model.disable_adapter_layers()
-        try:
-            yield
-        finally:
-            model.base_model.enable_adapter_layers()
+        yield
+    finally:
+        model.base_model.enable_adapter_layers()
 
 
 def _masked_mean_pool(H: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
