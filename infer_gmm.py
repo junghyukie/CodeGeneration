@@ -36,6 +36,7 @@ from transformers import (
     AutoModelForCausalLM,
     GenerationConfig,
 )
+from peft import PeftModel
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.pardir)))
 from utils.data.data_collator import DataCollator
@@ -374,16 +375,24 @@ def main():
     tokenizer = load_hf_tokenizer(args.model_name_or_path, fast_tokenizer=True)
     model_dtype = torch.float16 if device.type == "cuda" else torch.float32
 
-    model = AutoModelForCausalLM.from_pretrained(
+    base_model = AutoModelForCausalLM.from_pretrained(
         args.model_name_or_path,
         torch_dtype=model_dtype,
     )
 
-    for lora_id, lora_path in enumerate(inference_model_path[: i + 1]):
+    # PeftModel.from_pretrained wraps the base model so that add_weighted_adapter,
+    # set_adapter, delete_adapter, and disable_adapters are all available.
+    model = PeftModel.from_pretrained(
+        base_model,
+        args.base_path,
+        adapter_name="0",
+        subfolder=inference_model_path[0],
+    )
+    for lora_id, lora_path in enumerate(inference_model_path[1: i + 1], start=1):
         model.load_adapter(
-            peft_model_id=args.base_path,
+            args.base_path,
             adapter_name=str(lora_id),
-            adapter_kwargs={"subfolder": lora_path},
+            subfolder=lora_path,
         )
     print(f"[INFO] Loaded adapters: {list(model.peft_config.keys())}")
 
