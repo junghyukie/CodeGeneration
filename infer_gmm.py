@@ -637,9 +637,9 @@ def main():
 
     for task_idx, task in enumerate(cur_inference_tasks):
         if args.benchmark == "non-executable":
-            _, _, infer_dataset = create_codetask_dataset(task, args.seed, -1, -1, 3)
+            _, _, infer_dataset = create_codetask_dataset(task, args.seed, -1, -1, -1)
         else:
-            _, _, infer_dataset = create_executable_dataset(task, args.seed, -1, -1, 3)
+            _, _, infer_dataset = create_executable_dataset(task, args.seed, -1, -1, -1)
 
         inf_data_collator = DataCollator(
             tokenizer,
