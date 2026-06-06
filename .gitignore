@@ -4,3 +4,4 @@ infer_anyssr_total.py
 moe.py
 router_gmm_ckpt/
 router_gmm_ckpt*
+inference_results
