@@ -41,7 +41,14 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.
 from utils.data.data_collator import DataCollator
 from utils.data.data_utils import create_codetask_dataset, create_executable_dataset
 from utils.utils import to_device, set_random_seed, load_hf_tokenizer
-from training.params import AllDatasetName, AllDatasetNameExecutable
+AllDatasetName = [
+    "CONCODE", "CodeTrans", "CodeSearchNet", "BFP",
+    "KodCode", "RunBugRun", "TheVault_Csharp", "CoST",
+]
+AllDatasetNameExecutable = [
+    'python', 'cpp', 'swift', 'rust', 'csharp',
+    'java', 'php', 'typescript', 'shell',
+]
 from evaluator.compute_metrics import compute_metrics, DATASET_TO_OUTPUT_LANG
 
 
