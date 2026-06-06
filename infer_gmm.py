@@ -561,21 +561,23 @@ def main():
                 # prefix pool (first 64 tokens) captures actual prompt content,
                 # matching the training feature extraction in gmm.py.
                 k_hat, alpha = route_sample(sources[b])
-                moe_id = str(router.tasks[k_hat].task_id)
 
                 single_ids  = batch['input_ids'][b:b+1]
                 single_mask = batch['attention_mask'][b:b+1]
 
                 if args.routing_mode == "soft":
-                    alpha_str = "  ".join(
-                        f"{router.tasks[k].task_name}:{alpha[k]:.3f}"
+                    # moe_id: dict mapping task_name → weight for interpretability
+                    moe_id = {
+                        router.tasks[k].task_name: round(float(alpha[k]), 4)
                         for k in range(len(router.tasks))
-                    )
+                    }
+                    alpha_str = "  ".join(f"{n}:{w:.4f}" for n, w in moe_id.items())
                     print(f"[step {step}:{b}] soft routing → {alpha_str}")
                     generate_ids = _generate_soft(
                         single_ids, single_mask, alpha, pad_token_id, max_ans_len, gen_cfg,
                     )
                 else:
+                    moe_id = str(router.tasks[k_hat].task_id)
                     print(f"[step {step}:{b}] hard routing → "
                           f"task {moe_id} ({router.tasks[k_hat].task_name})")
                     generate_ids = _generate_hard(
@@ -625,7 +627,7 @@ def main():
         out = {"eval": evaluation_result, "predictions": rows}
         out_file = os.path.join(args.inference_output_path, f"results-{i_task}-{task}.json")
         with open(out_file, "w", encoding="utf-8") as f:
-            json.dump(out, f, ensure_ascii=False)
+            json.dump(out, f, ensure_ascii=False, indent=2)
             f.write("\n")
         print(f"[INFO] Saved results to {out_file}", flush=True)
 
