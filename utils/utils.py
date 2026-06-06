@@ -8,8 +8,14 @@ import random
 import numpy as np
 from transformers import set_seed, AutoTokenizer
 import json
-import deepspeed
-from deepspeed.runtime.zero.partition_parameters import ZeroParamStatus
+try:
+    import deepspeed
+    from deepspeed.runtime.zero.partition_parameters import ZeroParamStatus
+    _DEEPSPEED_AVAILABLE = True
+except (ImportError, Exception):
+    deepspeed = None
+    ZeroParamStatus = None
+    _DEEPSPEED_AVAILABLE = False
 
 
 def print_rank_0(msg, rank=0):
@@ -160,6 +166,8 @@ def get_optimizer_grouped_parameters(
 
 
 def _z3_params_to_fetch(param_list):
+    if not _DEEPSPEED_AVAILABLE:
+        raise RuntimeError("deepspeed is required for ZeRO-3 operations")
     return [
         p for p in param_list
         if hasattr(p, 'ds_id') and p.ds_status == ZeroParamStatus.NOT_AVAILABLE
@@ -167,6 +175,8 @@ def _z3_params_to_fetch(param_list):
 
 
 def moving_average(model, model_ema, beta=0.992, device=None, zero_stage=0):
+    if not _DEEPSPEED_AVAILABLE:
+        raise RuntimeError("deepspeed is required for moving_average")
     zero_stage_3 = (zero_stage == 3)
     with torch.no_grad():
         for param, param_ema in zip(model.parameters(),
@@ -184,6 +194,8 @@ def moving_average(model, model_ema, beta=0.992, device=None, zero_stage=0):
 
 
 def save_zero_three_model(model_ema, global_rank, save_dir, zero_stage=0, sub_folder=""):
+    if not _DEEPSPEED_AVAILABLE:
+        raise RuntimeError("deepspeed is required for save_zero_three_model")
     zero_stage_3 = (zero_stage == 3)
     save_dir = os.path.join(save_dir, sub_folder)
     os.makedirs(save_dir, exist_ok=True)
