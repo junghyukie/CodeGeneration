@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}
+CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-1}
 export CUDA_VISIBLE_DEVICES
 
 python gmm.py \
@@ -10,7 +10,7 @@ python gmm.py \
   --dataset_source codetask \
   --batch_size 16 \
   --train_k 5000 \
-  --eval_k 1000 \
+  --eval_k -1 \
   --routing_dim 256 \
   --gmm_components 4 \
   --feature_layers 4 \
