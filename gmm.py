@@ -12,14 +12,17 @@ from tqdm import tqdm
 from datasets import Dataset, concatenate_datasets, load_dataset
 from transformers import AutoModel, AutoTokenizer
 from torch.utils.data import DataLoader
-from t5_data import T5Dataset
+try:
+    from t5_data import T5Dataset
+except ImportError:
+    T5Dataset = None
 
 
 @dataclass
 class RouterConfig:
     model_name: str = "SalesForce/codet5-small"
     output_dir: str = "./router_gmm_ckpt"
-    dataset_source: str = "t5"
+    dataset_source: str = "codetask"
     executable_dataset_name: str = "ankhanhtran02/CL4Code-executable-datasets"
 
     tasks: Tuple[str, ...] = (
@@ -519,30 +522,36 @@ class ResidualFitGMMRouter:
         return router
 
 
-def build_dataloader(dataset_builder: T5Dataset, task: str, split: str, batch_size: int, k: int, seed: int, max_length: int):
-    old_dl = dataset_builder.get_final_ds(
-        task=task,
-        split=split,
-        batch_size=batch_size,
-        k=k,
-        seed=seed,
-        return_test=False,
-        max_length=max_length,
+def build_dataloader(tokenizer, task: str, split: str, batch_size: int, k: int, seed: int, max_length: int):
+    """Load from dongg18/CODETASK_with_instruction_pool, matching create_codetask_dataset()."""
+    hf_split = "validation" if split in {"eval", "validation"} else split
+    dataset = load_dataset(
+        "dongg18/CODETASK_with_instruction_pool",
+        data_files={hf_split: f"{task}/{hf_split}-*.parquet"},
+        split=hf_split,
     )
+    dataset = dataset.remove_columns([c for c in dataset.column_names if c not in ("input", "output")])
+    dataset = dataset.rename_column("input", "prompt")
+    dataset = dataset.rename_column("output", "answer")
 
-    pad_token_id = dataset_builder.tokenizer.pad_token_id
-    if pad_token_id is None:
-        pad_token_id = 0
+    if k != -1:
+        dataset = dataset.shuffle(seed=seed).select(range(min(k, len(dataset))))
+    else:
+        dataset = dataset.shuffle(seed=seed)
 
+    def preprocess_batch(examples):
+        src_texts = [str(t).strip() for t in examples["prompt"]]
+        return tokenizer(src_texts, padding="max_length", truncation=True, max_length=max_length)
+
+    enc = dataset.map(preprocess_batch, batched=True, remove_columns=dataset.column_names)
+    enc.set_format(type="torch", columns=["input_ids", "attention_mask"])
+
+    pad_token_id = tokenizer.pad_token_id if tokenizer.pad_token_id is not None else 0
     return DataLoader(
-        old_dl.dataset,
+        enc,
         batch_size=batch_size,
         shuffle=(split == "train"),
-        collate_fn=lambda batch: t5_pad_collate(
-            batch,
-            pad_token_id=pad_token_id,
-            label_pad_id=-100,
-        ),
+        collate_fn=lambda batch: t5_pad_collate(batch, pad_token_id=pad_token_id, label_pad_id=-100),
     )
 
 
@@ -604,7 +613,6 @@ def feature_cache_path(
 
 def get_or_extract_features(
     extractor: T5RoutingFeatureExtractor,
-    dataset_builder: Optional[T5Dataset],
     cfg: RouterConfig,
     task: str,
     split: str,
@@ -616,11 +624,9 @@ def get_or_extract_features(
     if cfg.save_features and path.exists() and not cfg.force_recompute_features:
         return torch.load(path, map_location="cpu").float()
 
-    if cfg.dataset_source == "t5":
-        if dataset_builder is None:
-            raise ValueError("dataset_builder is required for dataset_source=t5")
+    if cfg.dataset_source == "codetask":
         dl = build_dataloader(
-            dataset_builder=dataset_builder,
+            tokenizer=extractor.tokenizer,
             task=task,
             split=split,
             batch_size=cfg.batch_size,
@@ -658,7 +664,6 @@ class EvalResult:
 def evaluate_seen_tasks(
     router: ResidualFitGMMRouter,
     extractor: T5RoutingFeatureExtractor,
-    dataset_builder: Optional[T5Dataset],
     cfg: RouterConfig,
     seen_tasks: List[str],
     split: str,
@@ -672,7 +677,6 @@ def evaluate_seen_tasks(
     for true_id, task in enumerate(seen_tasks):
         z = get_or_extract_features(
             extractor=extractor,
-            dataset_builder=dataset_builder,
             cfg=cfg,
             task=task,
             split=split,
@@ -737,7 +741,6 @@ def run(cfg: RouterConfig) -> None:
     )
     extractor.save_projection(output_dir)
 
-    dataset_builder = T5Dataset(extractor.tokenizer) if cfg.dataset_source == "t5" else None
     router = ResidualFitGMMRouter(cfg)
 
     all_results: Dict[str, Dict] = {}
@@ -749,7 +752,6 @@ def run(cfg: RouterConfig) -> None:
 
         z_train = get_or_extract_features(
             extractor=extractor,
-            dataset_builder=dataset_builder,
             cfg=cfg,
             task=task,
             split="train",
@@ -763,7 +765,6 @@ def run(cfg: RouterConfig) -> None:
         result = evaluate_seen_tasks(
             router=router,
             extractor=extractor,
-            dataset_builder=dataset_builder,
             cfg=cfg,
             seen_tasks=seen_tasks,
             split=cfg.eval_split,
@@ -786,7 +787,7 @@ def build_argparser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser()
     p.add_argument("--model_name", type=str, default=RouterConfig.model_name)
     p.add_argument("--output_dir", type=str, default=RouterConfig.output_dir)
-    p.add_argument("--dataset_source", type=str, default=RouterConfig.dataset_source, choices=["t5", "executable"])
+    p.add_argument("--dataset_source", type=str, default=RouterConfig.dataset_source, choices=["codetask", "executable"])
     p.add_argument("--executable_dataset_name", type=str, default=RouterConfig.executable_dataset_name)
     p.add_argument(
         "--tasks",
@@ -823,7 +824,7 @@ def build_argparser() -> argparse.ArgumentParser:
 def main() -> None:
     args = build_argparser().parse_args()
     default_cfg = RouterConfig()
-    default_tasks = default_cfg.tasks if args.dataset_source == "t5" else ("swift",)
+    default_tasks = default_cfg.tasks if args.dataset_source == "codetask" else ("swift",)
     cfg = RouterConfig(
         model_name=args.model_name,
         output_dir=args.output_dir,

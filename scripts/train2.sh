@@ -1,6 +1,7 @@
 python gmm.py \
   --model_name Qwen/Qwen2.5-Coder-1.5B \
   --output_dir ./router_gmm_ckpt_codetask \
+  --dataset_source codetask \
   --batch_size 16 \
   --train_k 5000 \
   --eval_k 1000 \
