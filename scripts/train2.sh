@@ -1,3 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}
+export CUDA_VISIBLE_DEVICES
+
 python gmm.py \
   --model_name Qwen/Qwen2.5-Coder-1.5B \
   --output_dir ./router_gmm_ckpt_codetask \

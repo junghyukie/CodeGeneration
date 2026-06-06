@@ -10,6 +10,9 @@
 
 set -euo pipefail
 
+CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}
+export CUDA_VISIBLE_DEVICES
+
 ROUTING_MODE=${1:-soft}
 
 python infer_gmm.py \
