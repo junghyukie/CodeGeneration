@@ -14,14 +14,14 @@ ROUTING_MODE=${1:-soft}
 
 python infer_gmm.py \
   --model_name_or_path   Qwen/Qwen2.5-Coder-1.5B \
-  --base_path            dongg18/anamoe \
+  --base_path            ankhanhtran02/lora-per-task-executable-start-4 \
   --inference_model_path python,cpp,swift,rust,csharp,java,php,typescript,shell \
   --router_weight_path   ./router_gmm_ckpt \
   --benchmark            executable \
   --routing_mode         "${ROUTING_MODE}" \
   --routing_temperature  1.0 \
-  --max_prompt_len       320,320,256,130,512,256,256,256,256 \
-  --max_ans_len          150,256,128,120,300,128,128,128,128 \
+  --max_prompt_len       1024,1024,1024,1024,1024,1024,1024,1024,1024 \
+  --max_ans_len          2048,2048,2048,2048,2048,2048,2048,2048,2048 \
   --inference_batch      1 \
   --inference_tasks      all \
   --do_sample \
