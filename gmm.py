@@ -33,6 +33,7 @@ class RouterConfig:
         "KodCode",
         "RunBugRun",
         "TheVault_Csharp",
+        "CoST",
     )
 
     feature_layers: int = 4
