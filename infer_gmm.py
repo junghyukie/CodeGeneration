@@ -483,7 +483,7 @@ def main():
             adapter_names,
             alpha.tolist(),
             merged,
-            combination_type="linear",
+            combination_type="cat",
         )
         model.set_adapter(merged)
         try:
