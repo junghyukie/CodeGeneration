@@ -22,9 +22,9 @@ python infer_gmm.py \
   --router_weight_path   ./router_gmm_ckpt_codetask \
   --benchmark            non-executable \
   --routing_mode         "${ROUTING_MODE}" \
-  --routing_temperature  1.0 \
+  --routing_temperature  0.5 \
   --inference_batch      1 \
   --inference_tasks      all \
   --repetition_penalty   1.0 \
   --seed                 42 \
-  --inference_output_path ./inference_results/gmm_codetask_"${ROUTING_MODE}"
+  --inference_output_path ./inference_results/gmm_codetask_"${ROUTING_MODE}_temp_0.5"
