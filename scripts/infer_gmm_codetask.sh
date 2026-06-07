@@ -24,7 +24,7 @@ python infer_gmm.py \
   --routing_mode         "${ROUTING_MODE}" \
   --routing_temperature  1.0 \
   --inference_batch      1 \
-  --inference_tasks      CONCODE,CodeTrans \
+  --inference_tasks      all \
   --repetition_penalty   1.0 \
   --seed                 42 \
   --inference_output_path ./inference_results/gmm_codetask_"${ROUTING_MODE}"
