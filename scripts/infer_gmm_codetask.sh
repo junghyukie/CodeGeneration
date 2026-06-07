@@ -25,6 +25,8 @@ python infer_gmm.py \
   --routing_temperature  1.0 \
   --inference_batch      1 \
   --inference_tasks      all \
+  --max_prompt_len       320,320,256,130,512,256,256,256 \
+  --max_ans_len          150,256,128,120,300,128,128,128 \
   --repetition_penalty   1.0 \
   --seed                 42 \
   --inference_output_path ./inference_results/gmm_codetask_"${ROUTING_MODE}"

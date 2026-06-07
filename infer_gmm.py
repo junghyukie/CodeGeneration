@@ -645,8 +645,8 @@ def main():
             tokenizer,
             model=model,
             padding="longest",
-            max_prompt_len=int(args.max_prompt_len[i]),
-            max_ans_len=int(args.max_ans_len[i]),
+            max_prompt_len=int(args.max_prompt_len[task_idx]),
+            max_ans_len=int(args.max_ans_len[task_idx]),
             pad_to_multiple_of=8,
             inference=True,
         )
@@ -663,7 +663,7 @@ def main():
         print(f"\n***** Inference step {i}: task {task} [{args.routing_mode} routing] *****")
         sources, preds, gts, moe_ids = prediction(
             model, tokenizer, task, infer_dataloader, device, generation_config,
-            max_ans_len=int(args.max_ans_len[i]),
+            max_ans_len=int(args.max_ans_len[task_idx]),
         )
 
         evaluation_result = (

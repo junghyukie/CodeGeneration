@@ -1,6 +1,6 @@
 gmm_methodology.tex
 method.pdf
-infer_anyssr_total.py
+# infer_anyssr_total.py
 moe.py
 router_gmm_ckpt/
 router_gmm_ckpt*
