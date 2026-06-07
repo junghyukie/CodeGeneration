@@ -553,6 +553,7 @@ def main():
 
             del batch['sources']
             batch = to_device(batch, device)
+            print(batch['input_ids'])
             prompt_len = batch['input_ids'].shape[1]   # left-padded, same for all in batch
             batch_size  = batch['input_ids'].shape[0]
 
@@ -576,6 +577,7 @@ def main():
                     generate_ids = _generate_soft(
                         single_ids, single_mask, alpha, pad_token_id, max_ans_len, gen_cfg,
                     )
+                    print(f"[step {step}:{b}] generated {generate_ids}")
                 else:
                     moe_id = str(router.tasks[k_hat].task_id)
                     print(f"[step {step}:{b}] hard routing → "
@@ -589,6 +591,7 @@ def main():
                     skip_special_tokens=True,
                     clean_up_tokenization_spaces=False,
                 )
+                print(f"[step {step}:{b}] decoded sequences: {seqs}")
 
                 if is_executable and num_return_sequences > 1:
                     predicted_sequences.append(seqs)
@@ -637,9 +640,9 @@ def main():
 
     for task_idx, task in enumerate(cur_inference_tasks):
         if args.benchmark == "non-executable":
-            _, _, infer_dataset = create_codetask_dataset(task, args.seed, -1, -1, -1)
+            _, _, infer_dataset = create_codetask_dataset(task, args.seed, -1, -1, 3)
         else:
-            _, _, infer_dataset = create_executable_dataset(task, args.seed, -1, -1, -1)
+            _, _, infer_dataset = create_executable_dataset(task, args.seed, -1, -1, 3)
 
         inf_data_collator = DataCollator(
             tokenizer,
