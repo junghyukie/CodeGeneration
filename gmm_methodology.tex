@@ -69,10 +69,7 @@ We select the representation at layer $\ell^* = \min(\ell_{\mathrm{cfg}}, L)$ wi
     \mathbf{H} = \mathbf{H}^{(\ell^*)} \in \mathbb{R}^{T \times d}.
 \end{equation}
 
-\subsection{Dual-Pool Representation}
-
-Code generation prompts have a characteristic structure: the \emph{task instruction} (what to do) typically appears in the first tokens, while \emph{contextual code} (relevant snippets) occupies the remainder.
-To capture both levels of granularity we construct two pooled vectors.
+\subsection{Mean-Pool Representation}
 
 Let $\mathbf{m} \in \{0,1\}^T$ be the attention mask.
 The \emph{masked mean pooling} operator is:
@@ -80,17 +77,10 @@ The \emph{masked mean pooling} operator is:
     \operatorname{pool}(\mathbf{H}, \mathbf{m}) = \frac{\sum_{t=1}^{T} m_t \, \mathbf{h}_t}{\max\!\left(1,\, \sum_{t=1}^{T} m_t\right)} \in \mathbb{R}^d,
 \end{equation}
 where $\mathbf{h}_t$ is the $t$-th row of $\mathbf{H}$.
-
-Define the \emph{prefix length} $T_p = \min(64, T)$.
-We compute:
-\begin{align}
-    \mathbf{h}_{\mathrm{prefix}} &= \operatorname{pool}(\mathbf{H}_{1:T_p},\, \mathbf{m}_{1:T_p}) \in \mathbb{R}^d, \label{eq:hprefix} \\
-    \mathbf{h}_{\mathrm{full}}   &= \operatorname{pool}(\mathbf{H},\, \mathbf{m}) \in \mathbb{R}^d, \label{eq:hfull}
-\end{align}
-and concatenate them into a $2d$-dimensional vector:
+The routing representation is the full-sequence mean pool:
 \begin{equation}
-    \tilde{\mathbf{h}} = \left[\mathbf{h}_{\mathrm{prefix}};\, \mathbf{h}_{\mathrm{full}}\right] \in \mathbb{R}^{2d}.
-    \label{eq:concat}
+    \tilde{\mathbf{h}} = \operatorname{pool}(\mathbf{H},\, \mathbf{m}) \in \mathbb{R}^d.
+    \label{eq:hfull}
 \end{equation}
 
 \subsection{Layer Normalization and Random Projection}
@@ -98,18 +88,18 @@ and concatenate them into a $2d$-dimensional vector:
 
 We apply parameter-free Layer Normalization (no learnable scale or shift) to $\tilde{\mathbf{h}}$ to remove scale ambiguity:
 \begin{equation}
-    \mathbf{h} = \operatorname{LN}(\tilde{\mathbf{h}}) \in \mathbb{R}^{2d}, \qquad
+    \mathbf{h} = \operatorname{LN}(\tilde{\mathbf{h}}) \in \mathbb{R}^{d}, \qquad
     \operatorname{LN}(\mathbf{v}) = \frac{\mathbf{v} - \mu_{\mathbf{v}}}{\sigma_{\mathbf{v}} + \varepsilon} \cdot \mathbf{1},
     \label{eq:ln}
 \end{equation}
 where $\mu_\mathbf{v}$ and $\sigma_\mathbf{v}$ are the mean and standard deviation of the elements of $\mathbf{v}$, and $\varepsilon$ is a small numerical stabilizer.
 
-A \emph{fixed} projection matrix $\mathbf{P} \in \mathbb{R}^{p \times 2d}$ ($p \leq 2d$, default $p=256$) reduces dimensionality for efficient density estimation.
+A \emph{fixed} projection matrix $\mathbf{P} \in \mathbb{R}^{p \times d}$ ($p \leq d$, default $p=256$) reduces dimensionality for efficient density estimation.
 The rows of $\mathbf{P}$ are constructed to be orthonormal:
 
 \begin{enumerate}[noitemsep]
-    \item Draw $\mathbf{A} \in \mathbb{R}^{2d \times p}$ with $A_{ij} \sim \mathcal{N}(0, 1/p)$ using a fixed random seed.
-    \item Compute the thin QR factorization: $\mathbf{A} = \mathbf{Q}\mathbf{R}$, $\mathbf{Q} \in \mathbb{R}^{2d \times p}$.
+    \item Draw $\mathbf{A} \in \mathbb{R}^{d \times p}$ with $A_{ij} \sim \mathcal{N}(0, 1/p)$ using a fixed random seed.
+    \item Compute the thin QR factorization: $\mathbf{A} = \mathbf{Q}\mathbf{R}$, $\mathbf{Q} \in \mathbb{R}^{d \times p}$.
     \item Set $\mathbf{P} = \mathbf{Q}^\top$ so that $\mathbf{P}\mathbf{P}^\top = \mathbf{I}_p$.
 \end{enumerate}
 
@@ -132,14 +122,14 @@ Since $\mathbf{P}$ is fixed at initialization (from a seeded RNG) and never upda
 ]
     \node[box] (tok) {Tokenizer\\$x \to (I,\mathbf{m})$};
     \node[box, right=1.2cm of tok] (enc) {Frozen T5\\Encoder $f_\theta$};
-    \node[box, right=1.2cm of enc] (pool) {Dual-Pool\\(prefix + full)};
+    \node[box, right=1.2cm of enc] (pool) {Mean Pool};
     \node[box, right=1.2cm of pool] (ln)  {LN};
     \node[box, right=1.2cm of ln]  (proj) {$\mathbf{P}$ (fixed)};
     \node[box, right=1.2cm of proj, fill=green!12] (z) {$\mathbf{z}\in\mathbb{R}^p$};
 
     \draw[arr] (tok)  -- (enc);
     \draw[arr] (enc)  -- node[above,font=\scriptsize]{$\mathbf{H}\!\in\!\mathbb{R}^{T\times d}$} (pool);
-    \draw[arr] (pool) -- node[above,font=\scriptsize]{$\tilde{\mathbf{h}}\!\in\!\mathbb{R}^{2d}$} (ln);
+    \draw[arr] (pool) -- node[above,font=\scriptsize]{$\tilde{\mathbf{h}}\!\in\!\mathbb{R}^{d}$} (ln);
     \draw[arr] (ln)   -- node[above,font=\scriptsize]{$\mathbf{h}$} (proj);
     \draw[arr] (proj) -- (z);
 \end{tikzpicture}
@@ -480,13 +470,13 @@ Algorithm~\ref{alg:generation} gives the complete procedure.
 \node[font=\scriptsize, gray, below=0.15cm of mix]   {$\Sigma_k\alpha_k p_k$};
 
 \end{tikzpicture}
-\caption{End-to-end inference pipeline. The frozen backbone encodes input $x$ and the dual-pool aggregation (Section~\ref{sec:features}) yields the routing embedding $\mathbf{z}$. Each of the $K$ task GMMs evaluates the log-density $\log p_k(\mathbf{z})$, which is $z$-score normalised to produce comparable scores $s_k(\mathbf{z})$ (Section~\ref{sec:norm}). A temperature-scaled softmax converts these into soft routing weights $\bm{\alpha}(x)$ (Section~\ref{sec:soft_routing}), which are used to mix the $K$ expert output distributions into $p_{\mathrm{mix}}$ for beam-search decoding (Section~\ref{sec:expert_mix}).}
+\caption{End-to-end inference pipeline. The frozen backbone encodes input $x$ and mean-pool aggregation (Section~\ref{sec:features}) yields the routing embedding $\mathbf{z}$. Each of the $K$ task GMMs evaluates the log-density $\log p_k(\mathbf{z})$, which is $z$-score normalised to produce comparable scores $s_k(\mathbf{z})$ (Section~\ref{sec:norm}). A temperature-scaled softmax converts these into soft routing weights $\bm{\alpha}(x)$ (Section~\ref{sec:soft_routing}), which are used to mix the $K$ expert output distributions into $p_{\mathrm{mix}}$ for beam-search decoding (Section~\ref{sec:expert_mix}).}
 \label{fig:arch}
 \end{figure}
 
 The architecture has two key properties.
 First, the backbone and projection are frozen for the lifetime of the system, so no feature drift occurs as tasks accumulate.
-Second, the routing operates entirely in the GMM density space---there are no auxiliary branches, and the same normalised scores that drive hard routing during continual training are reused directly for soft routing at inference.
+Second, the routing operates entirely in the GMM density space — there are no auxiliary branches, and the same normalised scores that drive hard routing during continual training are reused directly for soft routing at inference.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Continual Learning Protocol}
@@ -503,7 +493,7 @@ The full continual training loop is described in Algorithm~\ref{alg:cl}.
 \Ensure Trained router with $K$ task GMMs
 \State Initialize empty router registry $\mathcal{R} \gets \varnothing$
 \For{$k = 1, \ldots, K$}
-    \State \textbf{Extract features:} $Z_k \gets \{\mathbf{z}_i^{(k)} = \mathbf{P}\operatorname{LN}([\mathbf{h}^{(k)}_{\mathrm{prefix}};\mathbf{h}^{(k)}_{\mathrm{full}}])\}_{i=1}^{N_k}$
+    \State \textbf{Extract features:} $Z_k \gets \{\mathbf{z}_i^{(k)} = \mathbf{P}\operatorname{LN}(\mathbf{h}^{(k)}_{\mathrm{full}})\}_{i=1}^{N_k}$
     \State \textbf{Fit task:} $(p_k, a_k, b_k) \gets \textsc{FitNewTask}(Z_k, \mathcal{R})$  \hfill\textit{(Algorithm~\ref{alg:fit_task})}
     \State $\mathcal{R} \gets \mathcal{R} \cup \{(p_k, a_k, b_k)\}$
     \State \textbf{Evaluate:} compute routing accuracy on all seen tasks $\mathcal{T}_1,\ldots,\mathcal{T}_k$
@@ -611,7 +601,6 @@ $\varepsilon$ & Numerical stabiliser & $10^{-8}$ \\
 $\kappa$ & Coverage threshold (novelty) & 0.0 \\
 $\tau_n$ & Novelty sigmoid temperature & 1.0 \\
 $\omega_{\min}$ & Minimum novelty weight & 0.05 \\
-$T_p$ & Prefix pool length (tokens) & 64 \\
 $N_{\mathrm{train}}$ & Training samples per task & 2000 \\
 $N_{\mathrm{eval}}$ & Evaluation samples per task & 1000 \\
 \midrule
@@ -632,7 +621,7 @@ We have described an end-to-end continual routing and generation system built on
 The key components are:
 \begin{enumerate}
     \item \textbf{Routing feature extraction (Section~\ref{sec:features}).}
-          A frozen backbone with dual-pool aggregation and a fixed QR-orthonormal projection yields stable, task-discriminative routing embeddings $\mathbf{z} \in \mathbb{R}^p$.
+          A frozen backbone with full-sequence mean pooling and a fixed QR-orthonormal projection yields stable, task-discriminative routing embeddings $\mathbf{z} \in \mathbb{R}^p$.
           No gradient updates to the backbone are ever needed.
 
     \item \textbf{Continual GMM fitting (Sections~\ref{sec:gmm}--\ref{sec:router}).}

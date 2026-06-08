@@ -5,7 +5,7 @@ Architecture (matches gmm_methodology.tex §2–6 and the training setup in trai
 - Layers 0–3 of the generation LLM act as the frozen routing feature extractor.
   LoRA adapters are disabled for this stage (matches gmm.py which uses a fresh
   copy of the same model for feature extraction, with no LoRA).
-- The layer-4 hidden state is dual-pooled (prefix-64 + full), LN-normalised, and
+- The layer-4 hidden state is mean-pooled (full sequence), LN-normalised, and
   projected to the GMM routing space via the saved projection matrix P.
 - GMM scores s_k(z) are computed and converted to soft routing weights α_k via
   temperature-scaled softmax (hard routing = τ → 0, i.e. argmax).
@@ -215,7 +215,7 @@ def extract_routing_embedding(
 
     Replicates the gmm.py feature pipeline (§2 of gmm_methodology.tex):
       tokenise (no left-padding) → frozen backbone → layer feature_layers hidden state
-      → dual-pool (prefix-64 + full) → LN → projection P → z
+      → mean-pool (full sequence) → LN → projection P → z
 
     The model's LoRA adapters are disabled for this call so the routing features
     come from the BASE model, matching the training setup.
@@ -246,11 +246,8 @@ def extract_routing_embedding(
     layer_idx = min(feature_layers, len(outputs.hidden_states) - 1)
     H = outputs.hidden_states[layer_idx]   # [1, T, D]
 
-    prefix_len = min(64, H.shape[1])
-    h_prefix = _masked_mean_pool(H[:, :prefix_len, :], attention_mask[:, :prefix_len])
-    h_full   = _masked_mean_pool(H, attention_mask)
-
-    pooled = torch.cat([h_prefix, h_full], dim=-1)          # [1, 2D]
+    h_full = _masked_mean_pool(H, attention_mask)  # [1, D]
+    pooled = h_full
     h = F.layer_norm(pooled.float(), (pooled.shape[-1],))   # normalise
     z = h @ projection.T.float()                            # [1, p]
     return z.cpu()

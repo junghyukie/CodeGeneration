@@ -216,8 +216,7 @@ class T5RoutingFeatureExtractor:
         if hidden_size is None:
             raise ValueError(f"Cannot infer hidden size from model config for {model_name}")
 
-        # We concatenate [prefix pooled; full pooled], so the projection input dim doubles.
-        proj_in_dim = hidden_size * 2
+        proj_in_dim = hidden_size
         self.P = self._make_row_orthonormal_projection(
             p=routing_dim,
             d=proj_in_dim,
@@ -273,16 +272,8 @@ class T5RoutingFeatureExtractor:
             denom = m.sum(dim=1).clamp_min(1.0)
             return (x * m).sum(dim=1) / denom
 
-        # Prefix pooling: keep instruction/task prompt region (first 64 tokens)
-        prefix_len = min(64, H.shape[1])
-        H_prefix = H[:, :prefix_len, :]
-        m_prefix = attention_mask[:, :prefix_len]
-
-        h_prefix = masked_mean_pool(H_prefix, m_prefix)  # [B, D]
-        h_full = masked_mean_pool(H, attention_mask)     # [B, D]
-
-        # concat prefix pooled + full pooled
-        pooled = torch.cat([h_prefix, h_full], dim=-1)   # [B, 2D]
+        h_full = masked_mean_pool(H, attention_mask)  # [B, D]
+        pooled = h_full
 
         # LN without learned affine params, matching method-level LN usage.
         h = F.layer_norm(pooled.float(), normalized_shape=(pooled.shape[-1],))
