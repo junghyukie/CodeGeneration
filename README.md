@@ -55,6 +55,71 @@ python t5_continual_ewc.py \
   --log_filepath logs/ewc_training.log \
 ```
 
+## Calibration Set Inference (Executable Benchmark)
+
+After training per-task anamoe adapters, evaluate them on the `calibration_MBPP` split of
+[`ankhanhtran02/CL4Code-executable-datasets`](https://huggingface.co/datasets/ankhanhtran02/CL4Code-executable-datasets).
+The script runs multi-GPU inference (via DeepSpeed) and writes one JSON file per language containing
+the source instruction, model predictions (up to `num_return_sequences` samples for pass@k), the
+reference solution, and the unit-test string needed for execution-based evaluation.
+
+### Quick start
+
+```bash
+# Train adapters first (produces ./output_models/lora_per_task_executable_start_4/<lang>/0/)
+bash scripts/train_anamoe_executable.sh
+
+# Run calibration inference (default: 3 GPUs, ZERO_STAGE=0)
+bash scripts/infer_calibration_split.sh
+```
+
+### Configuration
+
+| Variable          | Default                                                     | Description                          |
+|-------------------|-------------------------------------------------------------|--------------------------------------|
+| `MODEL`           | `Qwen/Qwen2.5-Coder-1.5B`                                  | Base model path or HF repo ID        |
+| `ADAPTER_BASE_DIR`| `./output_models/lora_per_task_executable_start_4`          | Root dir containing per-language adapters (`<lang>/0/`) or an HF Hub repo ID |
+| `OUTPUT_DIR`      | `./calibration_results`                                     | Directory for output JSON files      |
+| `CUDA_DEVICES`    | `0,1,2`                                                     | GPU indices exposed to the script    |
+| `NUM_GPUS`        | (auto-detected from `CUDA_DEVICES`)                         | Number of GPUs to use                |
+| `ZERO_STAGE`      | `0`                                                         | DeepSpeed ZeRO stage (0 = fastest for inference) |
+
+### Output format
+
+Each `calibration_<language>.json` contains a list of objects:
+
+```json
+[
+  {
+    "source": "Write a function that ...",
+    "ground-truth": "def solve(...):\n    ...",
+    "prediction": ["def solve(...):\n    ...", "..."],
+    "test": "assert solve(...) == ..."
+  }
+]
+```
+
+`prediction` is a list when `--num_return_sequences > 1` (for pass@k).
+
+### Single-GPU example
+
+```bash
+CUDA_DEVICES=0 NUM_GPUS=1 \
+  ADAPTER_BASE_DIR=./output_models/lora_per_task_executable_start_4 \
+  OUTPUT_DIR=./calibration_results \
+  bash scripts/infer_calibration_split.sh
+```
+
+### Loading adapters from HuggingFace Hub
+
+```bash
+ADAPTER_BASE_DIR=ankhanhtran02/lora-per-task-executable-start-4 \
+  bash scripts/infer_calibration_split.sh
+```
+
+The script will pass the repo ID to the trainer; the subfolder `<language>/0` is resolved
+automatically by `model.load_adapter`.
+
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

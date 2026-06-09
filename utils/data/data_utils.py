@@ -359,10 +359,31 @@ def _load_eval_dataset(language, max_eval_samples, seed=0) -> Dataset:
     return dataset
 
 
-def create_executable_dataset(dataset_name, seed, num_train, num_eval, num_test):
+def _load_calibration_dataset(language, max_eval_samples, seed=0) -> Dataset:
+    """Load calibration_MBPP split, keeping 'test' alongside prompt/answer."""
+    dataset = _load_split("ankhanhtran02/CL4Code-executable-datasets", "calibration_MBPP")
+    dataset = dataset.filter(
+        lambda row: row["language"] == language and row["solution"] is not None
+    )
+    dataset = _limit_dataset(dataset, max_eval_samples, seed)
+    if len(dataset) == 0:
+        raise ValueError(f"No calibration_MBPP samples found for language={language}.")
+    keep = {c for c in ("instruction", "solution", "test") if c in dataset.column_names}
+    dataset = dataset.remove_columns([c for c in dataset.column_names if c not in keep])
+    dataset = dataset.rename_column("instruction", "prompt")
+    dataset = dataset.rename_column("solution", "answer")
+    print(f"[calibration] {len(dataset)} examples for language={language}")
+    return dataset
+
+
+def create_executable_dataset(dataset_name, seed, num_train, num_eval, num_test,
+                               use_calibration_eval=False):
     train_dataset = _load_training_dataset(dataset_name, num_train, seed)
     test_dataset = _load_eval_dataset(dataset_name, num_test, seed)
-    eval_dataset = _load_eval_dataset(dataset_name, num_eval, seed)
+    if use_calibration_eval:
+        eval_dataset = _load_calibration_dataset(dataset_name, num_eval, seed)
+    else:
+        eval_dataset = _load_eval_dataset(dataset_name, num_eval, seed)
     return train_dataset, eval_dataset, test_dataset
 
 # step 1
