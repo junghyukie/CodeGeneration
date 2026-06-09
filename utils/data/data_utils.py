@@ -377,7 +377,7 @@ def _load_calibration_dataset(language, max_eval_samples, seed=0) -> Dataset:
     dataset = _load_split("ankhanhtran02/CL4Code-executable-datasets", "calibration_MBPP")
     allowed = _CALIB_MBPP_LANG_ALIASES.get(language, {language})
     dataset = dataset.filter(
-        lambda row: row["language"] in allowed and row["solution"] is not None
+        lambda row: row["language"] in allowed and row["test"] is not None
     )
     dataset = _limit_dataset(dataset, max_eval_samples, seed)
     if len(dataset) == 0:
