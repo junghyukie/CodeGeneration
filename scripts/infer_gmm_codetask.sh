@@ -10,7 +10,7 @@
 
 set -euo pipefail
 
-CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-2}
+CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}
 export CUDA_VISIBLE_DEVICES
 
 ROUTING_MODE=${1:-soft}
@@ -19,7 +19,7 @@ python infer_gmm.py \
   --model_name_or_path   Qwen/Qwen2.5-Coder-1.5B \
   --base_path            dongg18/anamoe \
   --inference_model_path "CONCODE/0","CodeTrans/0","CodeSearchNet/0","BFP/0","KodCode/0","RunBugRun/0","TheVault_Csharp/0","CoST/0" \
-  --router_weight_path   ./router_gmm_ckpt_codetask \
+  --router_weight_path   router/router_gmm_ckpt_codetask_remove_prefix \
   --benchmark            non-executable \
   --routing_mode         "${ROUTING_MODE}" \
   --routing_temperature  0.1 \

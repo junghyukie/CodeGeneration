@@ -6,3 +6,5 @@ router_gmm_ckpt/
 router_gmm_ckpt*
 inference_results
 inference.zip
+router_gmm*
+calibration_results/

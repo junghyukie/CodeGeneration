@@ -22,9 +22,9 @@ export HF_HOME=./.cache
 export HF_DATASETS_CACHE=./.cache
 
 : "${MODEL:=Qwen/Qwen2.5-Coder-1.5B}"
-: "${ADAPTER_BASE_DIR:=./output_models/lora_per_task_executable_start_4}"
+: "${ADAPTER_BASE_DIR:=ankhanhtran02/lora-per-task-executable-start-4}"
 : "${OUTPUT_DIR:=./calibration_results}"
-: "${CUDA_DEVICES:=0,1,2}"
+: "${CUDA_DEVICES:=0,1,2,3}"
 : "${ZERO_STAGE:=0}"
 
 export CUDA_VISIBLE_DEVICES="$CUDA_DEVICES"
@@ -68,7 +68,7 @@ for language in python cpp swift rust csharp java php typescript shell; do
       --num_eval            -1 \
       --num_test            1 \
       --seed                1234 \
-      --per_device_eval_batch_size 4 \
+      --per_device_eval_batch_size 8 \
       --do_sample \
       --num_return_sequences 5 \
       --temperature         0.2 \
@@ -80,7 +80,8 @@ for language in python cpp swift rust csharp java php typescript shell; do
       --zero_stage          "$ZERO_STAGE" \
       --deepspeed \
       --run_name            "calib_${language}" \
-      --group_name          "calibration_executable"
+      --group_name          "calibration_executable" \
+      --num_train_epochs 0
 
   echo "[calibration] Done: ${OUTPUT_DIR}/calibration_${language}.json"
 done
