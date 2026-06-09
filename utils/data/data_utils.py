@@ -359,11 +359,25 @@ def _load_eval_dataset(language, max_eval_samples, seed=0) -> Dataset:
     return dataset
 
 
+_CALIB_MBPP_LANG_ALIASES: dict = {
+    "python":     {"python", "Python"},
+    "cpp":        {"cpp", "c++", "C++"},
+    "java":       {"java", "Java"},
+    "swift":      {"swift", "Swift"},
+    "rust":       {"rust", "Rust"},
+    "csharp":     {"csharp", "c#", "C#", "CSharp"},
+    "php":        {"php", "PHP"},
+    "typescript": {"typescript", "TypeScript"},
+    "shell":      {"shell", "Shell", "bash", "Bash", "sh"},
+}
+
+
 def _load_calibration_dataset(language, max_eval_samples, seed=0) -> Dataset:
     """Load calibration_MBPP split, keeping 'test' alongside prompt/answer."""
     dataset = _load_split("ankhanhtran02/CL4Code-executable-datasets", "calibration_MBPP")
+    allowed = _CALIB_MBPP_LANG_ALIASES.get(language, {language})
     dataset = dataset.filter(
-        lambda row: row["language"] == language and row["solution"] is not None
+        lambda row: row["language"] in allowed and row["solution"] is not None
     )
     dataset = _limit_dataset(dataset, max_eval_samples, seed)
     if len(dataset) == 0:
