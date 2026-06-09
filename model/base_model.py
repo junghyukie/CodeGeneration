@@ -461,16 +461,18 @@ class CL_Base_Model:
             if idx in seen or idx >= n_total:
                 continue
             seen.add(idx)
-            row = {"source": src, "ground-truth": gt, "prediction": pred}
-            if has_test:
-                row["test"] = calib_ds[idx]["test"]
-            result_rows.append(row)
+            result_rows.append({
+                "source": src,
+                "ground-truth": gt,
+                "prediction": pred,
+                "test": calib_ds[idx]["test"] if has_test else "",
+            })
 
         out_dir = getattr(self.args, "inference_output_path", None) or self.args.output_dir or "."
         os.makedirs(out_dir, exist_ok=True)
         out_file = os.path.join(out_dir, f"calibration_{language}.json")
         with open(out_file, "w", encoding="utf-8") as f:
-            json.dump(result_rows, f, ensure_ascii=False, indent=2)
+            json.dump({"metrics": {}, "predictions": result_rows}, f, ensure_ascii=False, indent=2)
         print_rank_0(
             f"[calibration] Saved {len(result_rows)} results → {out_file}",
             self.args.global_rank,

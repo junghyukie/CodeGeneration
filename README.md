@@ -86,17 +86,20 @@ bash scripts/infer_calibration_split.sh
 
 ### Output format
 
-Each `calibration_<language>.json` contains a list of objects:
+Each `calibration_<language>.json` matches the `_save_generation_predictions` format:
 
 ```json
-[
-  {
-    "source": "Write a function that ...",
-    "ground-truth": "def solve(...):\n    ...",
-    "prediction": ["def solve(...):\n    ...", "..."],
-    "test": "assert solve(...) == ..."
-  }
-]
+{
+  "metrics": {},
+  "predictions": [
+    {
+      "source": "Write a function that ...",
+      "ground-truth": "def solve(...):\n    ...",
+      "prediction": ["def solve(...):\n    ...", "..."],
+      "test": "assert solve(...) == ..."
+    }
+  ]
+}
 ```
 
 `prediction` is a list when `--num_return_sequences > 1` (for pass@k).
