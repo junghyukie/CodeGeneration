@@ -15,6 +15,7 @@
 #   RESULTS_REPO_TYPE - HF repo type (dataset|model|space)  (default: dataset)
 #   OUTPUT_DIR        - where router checkpoints are saved   (default: ./router_gmm_traceback_ckpt)
 #   TASKS             - comma-separated language list        (default: all 9 languages)
+#   MAX_TRACEBACKS    - max deduped tracebacks per task      (default: 0 = unlimited)
 #
 # Usage:
 #   # Local calibration results (default):
@@ -57,4 +58,5 @@ python gmm_traceback.py \
   --tau_n                 1.0 \
   --truncate_side         left \
   --min_traceback_length  10 \
+  --max_tracebacks        "$MAX_TRACEBACKS" \
   --seed                  42
