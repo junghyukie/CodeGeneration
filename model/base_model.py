@@ -442,6 +442,12 @@ class CL_Base_Model:
 
         progress.close()
 
+        # Ensure all ranks finish generation before the collective.
+        # Without this barrier, a fast rank enters all_gather_object while a
+        # slow rank is still inside model.generate(), causing an NCCL timeout.
+        if dist.is_available() and dist.is_initialized() and dist.get_world_size() > 1:
+            dist.barrier()
+
         # Gather across all GPUs
         if dist.is_available() and dist.is_initialized() and dist.get_world_size() > 1:
             gathered = [None] * dist.get_world_size()
