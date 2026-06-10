@@ -374,6 +374,20 @@ class CL_Base_Model:
             self.args.global_rank,
         )
 
+        out_dir = getattr(self.args, "inference_output_path", None) or self.args.output_dir or "."
+        os.makedirs(out_dir, exist_ok=True)
+        rank = self.args.global_rank
+        is_dist = dist.is_available() and dist.is_initialized() and dist.get_world_size() > 1
+        world_size = dist.get_world_size() if is_dist else 1
+
+        # Purge stale shards from any interrupted previous run before writing new ones.
+        # Safe to do here because we are still before the inference loop — no rank has
+        # written a shard for this run yet.
+        if is_dist and rank == 0:
+            import glob as _glob
+            for _stale in _glob.glob(os.path.join(out_dir, f".calib_{language}_shard*.json")):
+                os.remove(_stale)
+
         do_sample = getattr(self.args, "do_sample", False)
         num_ret = int(getattr(self.args, "num_return_sequences", 1)) if do_sample else 1
         max_ans = int(self.args.max_ans_len[0])
@@ -442,23 +456,38 @@ class CL_Base_Model:
 
         progress.close()
 
-        # Ensure all ranks finish generation before the collective.
-        # Without this barrier, a fast rank enters all_gather_object while a
-        # slow rank is still inside model.generate(), causing an NCCL timeout.
-        if dist.is_available() and dist.is_initialized() and dist.get_world_size() > 1:
-            dist.barrier()
+        if is_dist:
+            # File-based gather: each rank writes its shard to disk, then rank 0
+            # polls for all shards and merges them.  This avoids any NCCL collective
+            # after the inference loop, which would time out when ranks finish
+            # model.generate() at different times (generation length is input-dependent).
+            import time
 
-        # Gather across all GPUs
-        if dist.is_available() and dist.is_initialized() and dist.get_world_size() > 1:
-            gathered = [None] * dist.get_world_size()
-            dist.all_gather_object(gathered, local_rows)
-            all_rows = [item for rank_rows in gathered for item in rank_rows]
+            def _wait_file(path, timeout=7200, poll=5):
+                deadline = time.time() + timeout
+                while not os.path.exists(path):
+                    if time.time() > deadline:
+                        raise TimeoutError(f"[calibration] timed out waiting for {path}")
+                    time.sleep(poll)
+
+            shard_path = os.path.join(out_dir, f".calib_{language}_shard{rank}.json")
+            with open(shard_path, "w", encoding="utf-8") as fh:
+                json.dump(local_rows, fh, ensure_ascii=False)
+
+            if rank != 0:
+                # Shard written; rank 0 will consume it.  Exit cleanly so the
+                # launcher does not kill rank 0 while it is still merging.
+                return
+
+            all_rows = []
+            for r in range(world_size):
+                shard = os.path.join(out_dir, f".calib_{language}_shard{r}.json")
+                _wait_file(shard)
+                with open(shard, encoding="utf-8") as fh:
+                    all_rows.extend(json.load(fh))
+                os.remove(shard)
         else:
             all_rows = local_rows
-
-        # Only rank 0 saves
-        if self.args.global_rank != 0:
-            return
 
         n_total = len(calib_ds) if calib_ds is not None else len(all_rows)
         seen = set()
@@ -474,8 +503,6 @@ class CL_Base_Model:
                 "test": calib_ds[idx]["test"] if has_test else "",
             })
 
-        out_dir = getattr(self.args, "inference_output_path", None) or self.args.output_dir or "."
-        os.makedirs(out_dir, exist_ok=True)
         out_file = os.path.join(out_dir, f"calibration_{language}.json")
         with open(out_file, "w", encoding="utf-8") as f:
             json.dump({"metrics": {}, "predictions": result_rows}, f, ensure_ascii=False, indent=2)

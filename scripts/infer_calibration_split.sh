@@ -24,17 +24,15 @@ export HF_DATASETS_CACHE=./.cache
 : "${MODEL:=Qwen/Qwen2.5-Coder-1.5B}"
 : "${ADAPTER_BASE_DIR:=ankhanhtran02/lora-per-task-executable-start-4}"
 : "${OUTPUT_DIR:=./calibration_results}"
-: "${CUDA_DEVICES:=0}"
+: "${CUDA_DEVICES:=0,1,2,3}"
 : "${ZERO_STAGE:=0}"
-# Calibration inference must run on a single GPU.
-# With multiple GPUs, DistributedSampler shards the data across ranks and
-# generation time varies per shard.  Ranks that finish early block at
-# all_gather_object() until NCCL times out (30 min) waiting for the slower rank.
-# Single-GPU avoids distributed coordination entirely: world_size=1 means
-# DistributedSampler covers all samples and all_gather_object is skipped.
-: "${NUM_GPUS:=1}"
 
 export CUDA_VISIBLE_DEVICES="$CUDA_DEVICES"
+
+# Count the number of GPUs from CUDA_DEVICES if NUM_GPUS is not set
+if [ -z "${NUM_GPUS:-}" ]; then
+  NUM_GPUS=$(echo "$CUDA_DEVICES" | tr ',' '\n' | wc -l)
+fi
 
 set -euo pipefail
 
