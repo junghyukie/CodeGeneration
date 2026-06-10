@@ -33,9 +33,10 @@ export HF_DATASETS_CACHE=./.cache
 : "${MODEL:=Qwen/Qwen2.5-Coder-1.5B}"
 : "${RESULTS_SOURCE:=hf_hub}"
 : "${RESULTS_DIR:=ankhanhtran02/executed_calibration_results}"
-: "${RESULTS_REPO_TYPE:=dataset}"
+: "${RESULTS_REPO_TYPE:=space}"
 : "${OUTPUT_DIR:=./router_gmm_traceback_ckpt}"
 : "${TASKS:=python,cpp,swift,rust,csharp}"
+: "${MAX_TRACEBACKS:=200}"
 
 python gmm_traceback.py \
   --model_name            "$MODEL" \
