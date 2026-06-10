@@ -41,7 +41,7 @@ set -euo pipefail
 mkdir -p "$OUTPUT_DIR"
 port=$(shuf -i25000-30000 -n1)
 
-for language in java php typescript shell; do
+for language in php typescript shell; do
   adapter_dir="${ADAPTER_BASE_DIR}/${language}/0"
 
   # For local adapters, verify the directory exists before proceeding

@@ -29,12 +29,12 @@
 export HF_HOME=./.cache
 export HF_DATASETS_CACHE=./.cache
 
-: "${MODEL:=Salesforce/codet5-small}"
-: "${RESULTS_SOURCE:=local}"
-: "${RESULTS_DIR:=./calibration_results}"
+: "${MODEL:=Qwen/Qwen2.5-Coder-1.5B}"
+: "${RESULTS_SOURCE:=hf_hub}"
+: "${RESULTS_DIR:=ankhanhtran02/executed_calibration_results}"
 : "${RESULTS_REPO_TYPE:=dataset}"
 : "${OUTPUT_DIR:=./router_gmm_traceback_ckpt}"
-: "${TASKS:=python,cpp,swift,rust,csharp,java,php,typescript,shell}"
+: "${TASKS:=python,cpp,swift,rust,csharp}"
 
 python gmm_traceback.py \
   --model_name            "$MODEL" \
