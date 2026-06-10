@@ -84,6 +84,7 @@ class TracebackRouterConfig:
     results_repo_type: str = "dataset"  # "dataset", "model", or "space" (hf_hub only)
     truncate_side: str = "left"         # keep END of traceback (error line); "right" keeps start
     min_traceback_length: int = 10      # discard empty / near-empty stderr entries
+    max_tracebacks: int = 0             # cap on deduped tracebacks per task (0 = unlimited)
 
 
 # ---------------------------------------------------------------------------
@@ -311,6 +312,9 @@ def run(cfg: TracebackRouterConfig) -> None:
 
         raw_tracebacks = extract_tracebacks(predictions, min_length=cfg.min_traceback_length)
         deduped = deduplicate_tracebacks(raw_tracebacks)
+        if cfg.max_tracebacks > 0 and len(deduped) > cfg.max_tracebacks:
+            print(f"[cap] Capping {len(deduped)} → {cfg.max_tracebacks} tracebacks for {task}")
+            deduped = deduped[: cfg.max_tracebacks]
         print_traceback_stats(task, raw_tracebacks, deduped)
 
         if not deduped:
@@ -401,6 +405,8 @@ def build_argparser() -> argparse.ArgumentParser:
                    choices=["left", "right"],
                    help="left = keep end of traceback (error type/message); right = keep start")
     p.add_argument("--min_traceback_length", type=int, default=d.min_traceback_length)
+    p.add_argument("--max_tracebacks", type=int, default=d.max_tracebacks,
+                   help="Maximum deduped tracebacks per task used for training (0 = unlimited)")
     return p
 
 
@@ -435,6 +441,7 @@ def main() -> None:
         results_repo_type=args.results_repo_type,
         truncate_side=args.truncate_side,
         min_traceback_length=args.min_traceback_length,
+        max_tracebacks=args.max_tracebacks,
     )
     run(cfg)
 
