@@ -26,7 +26,7 @@ python infer_gmm.py \
   --max_prompt_len       1024,1024,1024,1024,1024,1024,1024,1024,1024 \
   --max_ans_len          2048,2048,2048,2048,2048,2048,2048,2048,2048 \
   --inference_batch      1 \
-  --inference_tasks      all \
+  --inference_tasks      python,cpp,swift,rust,csharp,java,php,typescript,shell \
   --do_sample \
   --temperature          0.2 \
   --top_p                0.95 \
