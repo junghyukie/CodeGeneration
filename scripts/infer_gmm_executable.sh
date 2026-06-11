@@ -34,4 +34,4 @@ python infer_gmm.py \
   --num_return_sequences 5 \
   --repetition_penalty   1.0 \
   --seed                 42 \
-  --inference_output_path ./inference_results/gmm_exe_vf0.02_dim256_comp4_omega1.0_"${ROUTING_MODE}_temp_1.0"
+  --inference_output_path ./inference_results/gmm_exe_vf0.02_dim256_comp4_omega1.0_"${ROUTING_MODE}_temp_1.0/step_8"
