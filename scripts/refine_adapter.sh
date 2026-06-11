@@ -29,10 +29,10 @@ export HF_DATASETS_CACHE=./.cache
 : "${MODEL:=Qwen/Qwen2.5-Coder-1.5B}"
 : "${LANGUAGE:=python}"
 : "${ADAPTER_PATH:=ankhanhtran02/lora-per-task-executable-start-4}"
-: "${RESULTS_DIR:=./calibration_results}"
-: "${RESULTS_SOURCE:=local}"
+: "${RESULTS_SOURCE:=hf_hub}"
+: "${RESULTS_DIR:=ankhanhtran02/executed_calibration_results}"
 : "${OUTPUT_DIR:=./refined_adapters/${LANGUAGE}}"
-: "${CUDA_DEVICES:=0,1,2,3}"
+: "${CUDA_DEVICES:=4,5,6}"
 : "${ZERO_STAGE:=0}"
 
 export CUDA_VISIBLE_DEVICES="$CUDA_DEVICES"

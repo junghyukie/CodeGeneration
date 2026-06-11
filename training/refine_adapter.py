@@ -274,7 +274,7 @@ def parse_args():
                         help="Local dir or HF Hub repo ID containing calibration_{lang}.json files.")
     parser.add_argument("--results_source", type=str, default="local",
                         choices=["local", "hf_hub"])
-    parser.add_argument("--results_repo_type", type=str, default="dataset",
+    parser.add_argument("--results_repo_type", type=str, default="model",
                         choices=["dataset", "model", "space"])
 
     # ── Adapter ─────────────────────────────────────────────────────────────
