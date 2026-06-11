@@ -10,7 +10,7 @@
 
 set -euo pipefail
 
-CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}
+CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-7}
 export CUDA_VISIBLE_DEVICES
 
 ROUTING_MODE=${1:-soft}
@@ -22,7 +22,7 @@ python infer_gmm.py \
   --router_weight_path   router/router_gmm_ckpt_remove_prefix \
   --benchmark            executable \
   --routing_mode         "${ROUTING_MODE}" \
-  --routing_temperature  0.1 \
+  --routing_temperature  1.0 \
   --max_prompt_len       1024,1024,1024,1024,1024,1024,1024,1024,1024 \
   --max_ans_len          2048,2048,2048,2048,2048,2048,2048,2048,2048 \
   --inference_batch      1 \
@@ -34,4 +34,4 @@ python infer_gmm.py \
   --num_return_sequences 5 \
   --repetition_penalty   1.0 \
   --seed                 42 \
-  --inference_output_path ./inference_results/gmm_executable_"${ROUTING_MODE}_temp_0.1"
+  --inference_output_path ./inference_results/gmm_executable_"${ROUTING_MODE}_temp_1.0"
