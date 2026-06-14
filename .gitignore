@@ -6,3 +6,5 @@ inference_results
 inference.zip
 router_gmm*
 calibration_results*
+Makefile
+thesis

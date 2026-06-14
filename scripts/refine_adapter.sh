@@ -7,7 +7,7 @@
 #
 # Environment variables (all optional, defaults shown):
 #   MODEL            - base model path or HF repo         (default: Qwen/Qwen2.5-Coder-1.5B)
-#   LANGUAGE         - programming language to refine      (default: python)
+#   LANG_ID          - programming language to refine      (default: python)
 #   ADAPTER_PATH     - local adapter dir or HF Hub repo   (default: ankhanhtran02/lora-per-task-executable-start-4)
 #                      For local paths, provide the full adapter directory (containing adapter_config.json).
 #                      For HF Hub, the subfolder {language}/0 is resolved automatically.
@@ -20,18 +20,18 @@
 #
 # Usage:
 #   bash scripts/refine_adapter.sh
-#   LANGUAGE=cpp ADAPTER_PATH=./my_adapters/cpp/0 bash scripts/refine_adapter.sh
-#   LANGUAGE=python RESULTS_SOURCE=hf_hub RESULTS_DIR=my-org/calib-results bash scripts/refine_adapter.sh
+#   LANG_ID=cpp ADAPTER_PATH=./my_adapters/cpp/0 bash scripts/refine_adapter.sh
+#   LANG_ID=python RESULTS_SOURCE=hf_hub RESULTS_DIR=my-org/calib-results bash scripts/refine_adapter.sh
 
 export HF_HOME=./.cache
 export HF_DATASETS_CACHE=./.cache
 
 : "${MODEL:=Qwen/Qwen2.5-Coder-1.5B}"
-: "${LANGUAGE:=python}"
+: "${LANG_ID:=python}"
 : "${ADAPTER_PATH:=ankhanhtran02/lora-per-task-executable-start-4}"
 : "${RESULTS_SOURCE:=hf_hub}"
 : "${RESULTS_DIR:=ankhanhtran02/executed_calibration_results}"
-: "${OUTPUT_DIR:=./refined_adapters/${LANGUAGE}}"
+: "${OUTPUT_DIR:=./refined_adapters/${LANG_ID}}"
 : "${CUDA_DEVICES:=4,5,6}"
 : "${ZERO_STAGE:=0}"
 
@@ -47,7 +47,7 @@ mkdir -p "$OUTPUT_DIR"
 port=$(shuf -i25000-30000 -n1)
 
 echo "[refine] ============================================"
-echo "[refine] Language       : $LANGUAGE"
+echo "[refine] Language       : $LANG_ID"
 echo "[refine] Adapter source : $ADAPTER_PATH"
 echo "[refine] Results dir    : $RESULTS_DIR ($RESULTS_SOURCE)"
 echo "[refine] Output dir     : $OUTPUT_DIR"
@@ -58,7 +58,7 @@ echo "[refine] ============================================"
 deepspeed --master_port "$port" --num_gpus "$NUM_GPUS" \
   training/refine_adapter.py \
     --model_name_or_path          "$MODEL" \
-    --language                    "$LANGUAGE" \
+    --language                    "$LANG_ID" \
     --adapter_path                "$ADAPTER_PATH" \
     --results_dir                 "$RESULTS_DIR" \
     --results_source              "$RESULTS_SOURCE" \
@@ -72,7 +72,7 @@ deepspeed --master_port "$port" --num_gpus "$NUM_GPUS" \
     --max_ans_len                 1024 \
     --zero_stage                  "$ZERO_STAGE" \
     --deepspeed \
-    --run_name                    "refine_${LANGUAGE}" \
+    --run_name                    "refine_${LANG_ID}" \
     --group_name                  "refine_adapter" \
     --logging_steps               5 \
     --seed                        42
