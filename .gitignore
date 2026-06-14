@@ -6,5 +6,6 @@ inference_results
 inference.zip
 router_gmm*
 calibration_results*
+refined_adapters
 Makefile
 thesis
