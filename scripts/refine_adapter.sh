@@ -32,7 +32,7 @@ export HF_DATASETS_CACHE=./.cache
 : "${RESULTS_SOURCE:=hf_hub}"
 : "${RESULTS_DIR:=ankhanhtran02/executed_calibration_results}"
 : "${OUTPUT_BASE_DIR:=./refined_adapters}"
-: "${CUDA_DEVICES:=4,5,6}"
+: "${CUDA_DEVICES:=5,6}"
 : "${ZERO_STAGE:=0}"
 
 export CUDA_VISIBLE_DEVICES="$CUDA_DEVICES"
