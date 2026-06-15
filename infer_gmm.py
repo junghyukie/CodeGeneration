@@ -1168,7 +1168,7 @@ def main():
         if is_round2_mode:
             # ── Round-2+ mode: read previous results, refine hard samples ────
             if args.round_num == 2:
-                prev_filename = f"results-{i}-{task}.json"
+                prev_filename = f"calibration_{task}.json"
             else:
                 prev_filename = f"results-{i}-{task}-round{args.round_num - 1}.json"
 
