@@ -27,11 +27,11 @@ export HF_HOME=./.cache
 export HF_DATASETS_CACHE=./.cache
 
 : "${MODEL:=Qwen/Qwen2.5-Coder-1.5B}"
-: "${LANG_ID:=python}"
+: "${LANG_ID:=python,cpp,swift,rust,csharp,java,php,typescript,shell}"
 : "${ADAPTER_PATH:=ankhanhtran02/lora-per-task-executable-start-4}"
 : "${RESULTS_SOURCE:=hf_hub}"
 : "${RESULTS_DIR:=ankhanhtran02/executed_calibration_results}"
-: "${OUTPUT_DIR:=./refined_adapters/${LANG_ID}}"
+: "${OUTPUT_BASE_DIR:=./refined_adapters}"
 : "${CUDA_DEVICES:=4,5,6}"
 : "${ZERO_STAGE:=0}"
 
@@ -43,38 +43,43 @@ fi
 
 set -euo pipefail
 
-mkdir -p "$OUTPUT_DIR"
-port=$(shuf -i25000-30000 -n1)
+IFS=',' read -ra LANGUAGES <<< "$LANG_ID"
 
-echo "[refine] ============================================"
-echo "[refine] Language       : $LANG_ID"
-echo "[refine] Adapter source : $ADAPTER_PATH"
-echo "[refine] Results dir    : $RESULTS_DIR ($RESULTS_SOURCE)"
-echo "[refine] Output dir     : $OUTPUT_DIR"
-echo "[refine] GPUs           : $NUM_GPUS (CUDA_VISIBLE_DEVICES=$CUDA_DEVICES)"
-echo "[refine] ZeRO stage     : $ZERO_STAGE"
-echo "[refine] ============================================"
+for lang in "${LANGUAGES[@]}"; do
+  OUTPUT_DIR="${OUTPUT_BASE_DIR}/${lang}"
+  mkdir -p "$OUTPUT_DIR"
+  port=$(shuf -i25000-30000 -n1)
 
-deepspeed --master_port "$port" --num_gpus "$NUM_GPUS" \
-  training/refine_adapter.py \
-    --model_name_or_path          "$MODEL" \
-    --language                    "$LANG_ID" \
-    --adapter_path                "$ADAPTER_PATH" \
-    --results_dir                 "$RESULTS_DIR" \
-    --results_source              "$RESULTS_SOURCE" \
-    --output_dir                  "$OUTPUT_DIR" \
-    --per_device_train_batch_size 4 \
-    --gradient_accumulation_steps 4 \
-    --num_train_epochs            3 \
-    --learning_rate               5e-5 \
-    --weight_decay                0.01 \
-    --max_prompt_len              1024 \
-    --max_ans_len                 1024 \
-    --zero_stage                  "$ZERO_STAGE" \
-    --deepspeed \
-    --run_name                    "refine_${LANG_ID}" \
-    --group_name                  "refine_adapter" \
-    --logging_steps               5 \
-    --seed                        42
+  echo "[refine] ============================================"
+  echo "[refine] Language       : $lang"
+  echo "[refine] Adapter source : $ADAPTER_PATH"
+  echo "[refine] Results dir    : $RESULTS_DIR ($RESULTS_SOURCE)"
+  echo "[refine] Output dir     : $OUTPUT_DIR"
+  echo "[refine] GPUs           : $NUM_GPUS (CUDA_VISIBLE_DEVICES=$CUDA_DEVICES)"
+  echo "[refine] ZeRO stage     : $ZERO_STAGE"
+  echo "[refine] ============================================"
 
-echo "[refine] Done. Adapter saved to $OUTPUT_DIR"
+  deepspeed --master_port "$port" --num_gpus "$NUM_GPUS" \
+    training/refine_adapter.py \
+      --model_name_or_path          "$MODEL" \
+      --language                    "$lang" \
+      --adapter_path                "$ADAPTER_PATH" \
+      --results_dir                 "$RESULTS_DIR" \
+      --results_source              "$RESULTS_SOURCE" \
+      --output_dir                  "$OUTPUT_DIR" \
+      --per_device_train_batch_size 4 \
+      --gradient_accumulation_steps 4 \
+      --num_train_epochs            3 \
+      --learning_rate               5e-5 \
+      --weight_decay                0.01 \
+      --max_prompt_len              1024 \
+      --max_ans_len                 2048 \
+      --zero_stage                  "$ZERO_STAGE" \
+      --deepspeed \
+      --run_name                    "refine_${lang}" \
+      --group_name                  "refine_adapter" \
+      --logging_steps               5 \
+      --seed                        42
+
+  echo "[refine] Done. Adapter saved to $OUTPUT_DIR"
+done

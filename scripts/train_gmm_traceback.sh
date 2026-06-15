@@ -35,8 +35,8 @@ export HF_DATASETS_CACHE=./.cache
 : "${RESULTS_DIR:=ankhanhtran02/executed_calibration_results}"
 : "${RESULTS_REPO_TYPE:=model}"
 : "${OUTPUT_DIR:=./router_gmm_traceback_ckpt}"
-: "${TASKS:=python,cpp,swift,rust,csharp}"
-: "${MAX_TRACEBACKS:=200}"
+: "${TASKS:=python,cpp,swift,rust,csharp,java,php,typescript,shell}"
+: "${MAX_TRACEBACKS:=0}"
 
 python gmm_traceback.py \
   --model_name            "$MODEL" \
