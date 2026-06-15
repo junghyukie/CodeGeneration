@@ -585,6 +585,24 @@ def parse_args():
              'takes over. conf = max(p_trace) - entropy(p_trace). '
              'Typical range: -0.5 to 0.5.',
     )
+    parser.add_argument(
+        '--prev_results_source', type=str, default='local', choices=['local', 'hf_hub'],
+        help='Where to load previous-round results: "local" (default) or "hf_hub".',
+    )
+    parser.add_argument(
+        '--prev_results_repo_type', type=str, default='model',
+        help='HF Hub repo type for --prev_results_dir when --prev_results_source=hf_hub (default: model).',
+    )
+    parser.add_argument(
+        '--pass_through_correct', action='store_true',
+        help='Include samples with ≥1 correct prediction unchanged in the round-2 output, '
+             'preserving total sample count relative to the previous round.',
+    )
+    parser.add_argument(
+        '--pad_predictions_to', type=int, default=5,
+        help='Pad re-generated prediction lists to this length with empty strings '
+             '(default: 5). Set to 0 to disable padding.',
+    )
 
     return parser.parse_args()
 
@@ -1153,10 +1171,22 @@ def main():
                 prev_filename = f"results-{i}-{task}.json"
             else:
                 prev_filename = f"results-{i}-{task}-round{args.round_num - 1}.json"
-            prev_path = os.path.join(args.prev_results_dir, prev_filename)
-            if not os.path.exists(prev_path):
-                print(f"[round2] Skipping {task}: {prev_path} not found.")
-                continue
+
+            if args.prev_results_source == "hf_hub":
+                try:
+                    prev_path = hf_hub_download(
+                        repo_id=args.prev_results_dir,
+                        filename=prev_filename,
+                        repo_type=args.prev_results_repo_type,
+                    )
+                except Exception as e:
+                    print(f"[round2] Skipping {task}: {prev_filename} not found on HF Hub ({e}).")
+                    continue
+            else:
+                prev_path = os.path.join(args.prev_results_dir, prev_filename)
+                if not os.path.exists(prev_path):
+                    print(f"[round2] Skipping {task}: {prev_path} not found.")
+                    continue
 
             with open(prev_path, "r", encoding="utf-8") as f:
                 prev_data = json.load(f)
@@ -1164,9 +1194,51 @@ def main():
 
             print(f"\n***** Round {args.round_num} step {i}: task {task} "
                   f"[{args.round2_routing_method} routing] *****")
-            sources, preds, gts, moe_ids, in_scores_list, tb_scores_list = prediction_round2(
+            hard_src, hard_pred, hard_gt, hard_moe, hard_in_sc, hard_tb_sc = prediction_round2(
                 prev_preds, task_idx, task
             )
+
+            # Pad hard-sample predictions to a fixed width with empty strings
+            if args.pad_predictions_to > 0 and hard_pred:
+                hard_pred = [
+                    (seqs + [""] * args.pad_predictions_to)[:args.pad_predictions_to]
+                    for seqs in hard_pred
+                ]
+
+            sources, preds, gts, moe_ids, in_scores_list, tb_scores_list = (
+                hard_src, hard_pred, hard_gt, hard_moe, hard_in_sc, hard_tb_sc
+            )
+
+            # Merge easy (pass-through) samples with re-generated hard samples
+            if args.pass_through_correct:
+                easy_rows = [r for r in prev_preds if any(p != 0 for p in r.get("passed", []))]
+                if easy_rows:
+                    easy_src   = [r["source"]                 for r in easy_rows]
+                    easy_pred  = [r["prediction"]              for r in easy_rows]
+                    easy_gt    = [r.get("ground-truth", "")    for r in easy_rows]
+                    easy_moe   = [r.get("moe_id")              for r in easy_rows]
+                    easy_in_sc = [r.get("input_router_scores") for r in easy_rows]
+                    easy_tb_sc = [None] * len(easy_rows)
+
+                    all_src   = hard_src   + easy_src
+                    all_pred  = hard_pred  + easy_pred
+                    all_gt    = hard_gt    + easy_gt
+                    all_moe   = hard_moe   + easy_moe
+                    all_in_sc = hard_in_sc + easy_in_sc
+                    all_tb_sc = hard_tb_sc + easy_tb_sc
+
+                    src_to_idx = {r["source"]: idx for idx, r in enumerate(prev_preds)}
+                    order = sorted(
+                        range(len(all_src)),
+                        key=lambda j: src_to_idx.get(all_src[j], len(prev_preds)),
+                    )
+                    sources        = [all_src[j]   for j in order]
+                    preds          = [all_pred[j]   for j in order]
+                    gts            = [all_gt[j]     for j in order]
+                    moe_ids        = [all_moe[j]    for j in order]
+                    in_scores_list = [all_in_sc[j]  for j in order]
+                    tb_scores_list = [all_tb_sc[j]  for j in order]
+
             if not sources:
                 continue
 
