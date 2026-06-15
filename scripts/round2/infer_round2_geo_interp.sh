@@ -34,7 +34,7 @@ export HF_DATASETS_CACHE=./.cache
 : "${TB_ROUTER_PATH:=./router_gmm_traceback_ckpt}"
 : "${OUTPUT_DIR:=./inference_results/round2_geo_interp}"
 : "${TASKS:=python,cpp,swift,rust,csharp,java,php,typescript,shell}"
-: "${CUDA_DEVICE:=0}"
+: "${CUDA_DEVICE:=3}"
 : "${ROUND_NUM:=2}"
 : "${ROUND2_ALPHA:=0.3}"
 
