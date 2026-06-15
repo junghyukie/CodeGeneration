@@ -909,13 +909,14 @@ def main():
 
     def save_results(evaluation_result, sources_sequences, predicted_sequences,
                      ground_truths, moe_ids, router_scores_list, i_task, task,
-                     filename=None, test_cases=None, tb_scores_list=None):
+                     filename=None, test_cases=None, tb_scores_list=None, prompts_list=None):
         """Save inference results in the standard format.
 
         router_scores_list: raw z-scored GMM log-probs per sample — saved so
             subsequent rounds can reuse them without re-running the input router.
         test_cases: optional list of test strings to carry forward for execution.
         tb_scores_list: traceback router scores (round 2+), saved for analysis.
+        prompts_list: refine prompts used for generation (round 2+); None for pass-through samples.
         """
         os.makedirs(args.inference_output_path, exist_ok=True)
         n = len(predicted_sequences)
@@ -927,11 +928,12 @@ def main():
         scores_adj      = _pad(router_scores_list)
         tb_scores_adj   = _pad(tb_scores_list) if tb_scores_list else [None] * n
         test_cases_adj  = _pad(test_cases) if test_cases else [None] * n
+        prompts_adj     = _pad(prompts_list) if prompts_list else [None] * n
 
         rows = []
-        for src, gt, pred, mid, sc, tb_sc, tc in zip(
+        for src, gt, pred, mid, sc, tb_sc, tc, prompt in zip(
             sources_sequences, ground_truths, predicted_sequences,
-            moe_ids_adj, scores_adj, tb_scores_adj, test_cases_adj,
+            moe_ids_adj, scores_adj, tb_scores_adj, test_cases_adj, prompts_adj,
         ):
             row = {
                 "source": src,
@@ -944,6 +946,8 @@ def main():
                 row["traceback_router_scores"] = tb_sc
             if tc is not None:
                 row["test"] = tc
+            if prompt is not None:
+                row["instruction"] = prompt
             rows.append(row)
 
         out = {"eval": evaluation_result, "predictions": rows}
@@ -1032,7 +1036,7 @@ def main():
         greedy_cfg = GenerationConfig(do_sample=False, repetition_penalty=args.repetition_penalty)
 
         out_sources, out_preds, out_gts = [], [], []
-        out_moe_ids, out_in_scores, out_tb_scores = [], [], []
+        out_moe_ids, out_in_scores, out_tb_scores, out_prompts = [], [], [], []
 
         for row in tqdm(hard_rows, desc=f"round2/{task}"):
             src = row["source"]
@@ -1156,8 +1160,9 @@ def main():
             out_moe_ids.append(moe_id)
             out_in_scores.append(in_scores.tolist())
             out_tb_scores.append(tb_scores.tolist())
+            out_prompts.append(prompt)
 
-        return out_sources, out_preds, out_gts, out_moe_ids, out_in_scores, out_tb_scores
+        return out_sources, out_preds, out_gts, out_moe_ids, out_in_scores, out_tb_scores, out_prompts
 
     # ── Evaluate all tasks seen at step i ─────────────────────────────────────
 
@@ -1194,7 +1199,7 @@ def main():
 
             print(f"\n***** Round {args.round_num} step {i}: task {task} "
                   f"[{args.round2_routing_method} routing] *****")
-            hard_src, hard_pred, hard_gt, hard_moe, hard_in_sc, hard_tb_sc = prediction_round2(
+            hard_src, hard_pred, hard_gt, hard_moe, hard_in_sc, hard_tb_sc, hard_prompts = prediction_round2(
                 prev_preds, task_idx, task
             )
 
@@ -1205,39 +1210,42 @@ def main():
                     for seqs in hard_pred
                 ]
 
-            sources, preds, gts, moe_ids, in_scores_list, tb_scores_list = (
-                hard_src, hard_pred, hard_gt, hard_moe, hard_in_sc, hard_tb_sc
+            sources, preds, gts, moe_ids, in_scores_list, tb_scores_list, prompts_list = (
+                hard_src, hard_pred, hard_gt, hard_moe, hard_in_sc, hard_tb_sc, hard_prompts
             )
 
             # Merge easy (pass-through) samples with re-generated hard samples
             if args.pass_through_correct:
                 easy_rows = [r for r in prev_preds if any(p != 0 for p in r.get("passed", []))]
                 if easy_rows:
-                    easy_src   = [r["source"]                 for r in easy_rows]
-                    easy_pred  = [r["prediction"]              for r in easy_rows]
-                    easy_gt    = [r.get("ground-truth", "")    for r in easy_rows]
-                    easy_moe   = [r.get("moe_id")              for r in easy_rows]
-                    easy_in_sc = [r.get("input_router_scores") for r in easy_rows]
-                    easy_tb_sc = [None] * len(easy_rows)
+                    easy_src     = [r["source"]                 for r in easy_rows]
+                    easy_pred    = [r["prediction"]              for r in easy_rows]
+                    easy_gt      = [r.get("ground-truth", "")    for r in easy_rows]
+                    easy_moe     = [r.get("moe_id")              for r in easy_rows]
+                    easy_in_sc   = [r.get("input_router_scores") for r in easy_rows]
+                    easy_tb_sc   = [None] * len(easy_rows)
+                    easy_prompts = [None] * len(easy_rows)
 
-                    all_src   = hard_src   + easy_src
-                    all_pred  = hard_pred  + easy_pred
-                    all_gt    = hard_gt    + easy_gt
-                    all_moe   = hard_moe   + easy_moe
-                    all_in_sc = hard_in_sc + easy_in_sc
-                    all_tb_sc = hard_tb_sc + easy_tb_sc
+                    all_src     = hard_src     + easy_src
+                    all_pred    = hard_pred    + easy_pred
+                    all_gt      = hard_gt      + easy_gt
+                    all_moe     = hard_moe     + easy_moe
+                    all_in_sc   = hard_in_sc   + easy_in_sc
+                    all_tb_sc   = hard_tb_sc   + easy_tb_sc
+                    all_prompts = hard_prompts + easy_prompts
 
                     src_to_idx = {r["source"]: idx for idx, r in enumerate(prev_preds)}
                     order = sorted(
                         range(len(all_src)),
                         key=lambda j: src_to_idx.get(all_src[j], len(prev_preds)),
                     )
-                    sources        = [all_src[j]   for j in order]
-                    preds          = [all_pred[j]   for j in order]
-                    gts            = [all_gt[j]     for j in order]
-                    moe_ids        = [all_moe[j]    for j in order]
-                    in_scores_list = [all_in_sc[j]  for j in order]
-                    tb_scores_list = [all_tb_sc[j]  for j in order]
+                    sources        = [all_src[j]     for j in order]
+                    preds          = [all_pred[j]     for j in order]
+                    gts            = [all_gt[j]       for j in order]
+                    moe_ids        = [all_moe[j]      for j in order]
+                    in_scores_list = [all_in_sc[j]    for j in order]
+                    tb_scores_list = [all_tb_sc[j]    for j in order]
+                    prompts_list   = [all_prompts[j]  for j in order]
 
             if not sources:
                 continue
@@ -1254,6 +1262,7 @@ def main():
                 filename=out_filename,
                 test_cases=test_cases,
                 tb_scores_list=tb_scores_list,
+                prompts_list=prompts_list,
             )
 
         else:
