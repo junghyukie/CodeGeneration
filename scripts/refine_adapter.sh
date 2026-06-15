@@ -27,12 +27,12 @@ export HF_HOME=./.cache
 export HF_DATASETS_CACHE=./.cache
 
 : "${MODEL:=Qwen/Qwen2.5-Coder-1.5B}"
-: "${LANG_ID:=python,cpp,swift,rust,csharp,java,php,typescript,shell}"
+: "${LANG_ID:=php,typescript,shell}"
 : "${ADAPTER_PATH:=ankhanhtran02/lora-per-task-executable-start-4}"
 : "${RESULTS_SOURCE:=hf_hub}"
 : "${RESULTS_DIR:=ankhanhtran02/executed_calibration_results}"
 : "${OUTPUT_BASE_DIR:=./refined_adapters}"
-: "${CUDA_DEVICES:=5,6}"
+: "${CUDA_DEVICES:=3,4,5,6}"
 : "${ZERO_STAGE:=0}"
 
 export CUDA_VISIBLE_DEVICES="$CUDA_DEVICES"
@@ -67,7 +67,7 @@ for lang in "${LANGUAGES[@]}"; do
       --results_dir                 "$RESULTS_DIR" \
       --results_source              "$RESULTS_SOURCE" \
       --output_dir                  "$OUTPUT_DIR" \
-      --per_device_train_batch_size 4 \
+      --per_device_train_batch_size 2 \
       --gradient_accumulation_steps 4 \
       --num_train_epochs            3 \
       --learning_rate               5e-5 \
