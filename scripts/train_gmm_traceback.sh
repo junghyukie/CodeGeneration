@@ -16,6 +16,7 @@
 #   OUTPUT_DIR        - where router checkpoints are saved   (default: ./router_gmm_traceback_ckpt)
 #   TASKS             - comma-separated language list        (default: all 9 languages)
 #   MAX_TRACEBACKS    - max deduped tracebacks per task      (default: 0 = unlimited)
+#   CUDA_DEVICES      - GPU indices to expose                (default: 0,1,2,3)
 #
 # Usage:
 #   # Local calibration results (default):
@@ -37,6 +38,9 @@ export HF_DATASETS_CACHE=./.cache
 : "${OUTPUT_DIR:=./router_gmm_traceback_ckpt}"
 : "${TASKS:=python,cpp,swift,rust,csharp,java,php,typescript,shell}"
 : "${MAX_TRACEBACKS:=0}"
+: "${CUDA_DEVICES:=2}"
+
+export CUDA_VISIBLE_DEVICES="$CUDA_DEVICES"
 
 python gmm_traceback.py \
   --model_name            "$MODEL" \
