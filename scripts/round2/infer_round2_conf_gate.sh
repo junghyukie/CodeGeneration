@@ -45,8 +45,8 @@ set -euo pipefail
 mkdir -p "$OUTPUT_DIR"
 
 ADAPTER_PATHS=$(echo "$TASKS" | tr ',' '\n' | awk '{print $1"/0"}' | paste -sd ',' -)
-MAX_PROMPT_LENS="320,320,256,130,512,256,256,256,256"
-MAX_ANS_LENS="150,256,128,120,300,128,128,128,128"
+MAX_PROMPT_LENS="1024,1024,1024,1024,1024,1024,1024,1024,1024"
+MAX_ANS_LENS="2048,2048,2048,2048,2048,2048,2048,2048,2048"
 
 echo "[round2_conf_gate] ============================================"
 echo "[round2_conf_gate] Model          : $MODEL"
