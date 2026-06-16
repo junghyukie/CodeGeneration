@@ -594,6 +594,10 @@ def parse_args():
         help='HF Hub repo type for --prev_results_dir when --prev_results_source=hf_hub (default: model).',
     )
     parser.add_argument(
+        '--prev_results_subfolder', type=str, default=None,
+        help='Subfolder within the HF Hub repo (or local dir) that contains the previous-round result files.',
+    )
+    parser.add_argument(
         '--pass_through_correct', action='store_true',
         help='Include samples with ≥1 correct prediction unchanged in the round-2 output, '
              'preserving total sample count relative to the previous round.',
@@ -1183,12 +1187,17 @@ def main():
                         repo_id=args.prev_results_dir,
                         filename=prev_filename,
                         repo_type=args.prev_results_repo_type,
+                        subfolder=args.prev_results_subfolder,
                     )
                 except Exception as e:
                     print(f"[round2] Skipping {task}: {prev_filename} not found on HF Hub ({e}).")
                     continue
             else:
-                prev_path = os.path.join(args.prev_results_dir, prev_filename)
+                base_dir = (
+                    os.path.join(args.prev_results_dir, args.prev_results_subfolder)
+                    if args.prev_results_subfolder else args.prev_results_dir
+                )
+                prev_path = os.path.join(base_dir, prev_filename)
                 if not os.path.exists(prev_path):
                     print(f"[round2] Skipping {task}: {prev_path} not found.")
                     continue
