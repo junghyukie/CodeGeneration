@@ -10,7 +10,7 @@
 #   MODEL               - base LLM path or HF repo         (default: Qwen/Qwen2.5-Coder-1.5B)
 #   BASE_PATH           - LoRA adapter repo or local dir    (default: ankhanhtran02/lora-per-task-executable-start-4)
 #   ROUTER_PATH         - GMM input-router checkpoint dir   (default: ./router_exe/...)
-#   PREV_RESULTS_DIR    - HF Hub repo with round-1 results  (default: ankhanhtran02/executed_calibration_results)
+#   PREV_RESULTS_DIR    - local dir with round-1 results  (default: inference_results/gmm_exe_vf0.02_dim256_comp4_omega1.0_top3_temp_1.0)
 #   TB_ROUTER_PATH      - traceback router checkpoint dir   (default: ./router_gmm_traceback_ckpt)
 #   OUTPUT_DIR          - where round-2 results are saved   (default: ./inference_results/round2_conf_linear)
 #   TASKS               - comma-separated language list     (default: all 9 languages)
@@ -26,8 +26,8 @@ export HF_DATASETS_CACHE=./.cache
 : "${MODEL:=Qwen/Qwen2.5-Coder-1.5B}"
 : "${BASE_PATH:=ankhanhtran02/lora-per-task-executable-start-4}"
 : "${ROUTER_PATH:=./router_exe/router_gmm_exe_vf0.02_dim_256_comp_4_omega_1.0_layer_4}"
-: "${PREV_RESULTS_DIR:=ankhanhtran02/executed_calibration_results}"
-: "${PREV_RESULTS_SOURCE:=hf_hub}"
+: "${PREV_RESULTS_DIR:=inference_results/gmm_exe_vf0.02_dim256_comp4_omega1.0_top3_temp_1.0}"
+: "${PREV_RESULTS_SOURCE:=local}"
 : "${TB_ROUTER_PATH:=./router_gmm_traceback_ckpt}"
 : "${OUTPUT_DIR:=./inference_results/round2_conf_linear}"
 : "${TASKS:=python,cpp,swift,rust,csharp,java,php,typescript,shell}"
@@ -77,3 +77,7 @@ python infer_gmm.py \
   --pad_predictions_to    5
 
 echo "[round2_conf_linear] Done. Results saved to $OUTPUT_DIR"
+
+HF_REPO="ankhanhtran02/$(basename "$OUTPUT_DIR")"
+echo "[round2_conf_linear] Uploading $OUTPUT_DIR → $HF_REPO"
+python upload_output_to_hf.py --output-dir "$OUTPUT_DIR" --repo-id "$HF_REPO"
