@@ -80,9 +80,6 @@ class RouterConfig:
     em_tol: float = 1e-4
     variance_floor: float = 1e-4
     eps: float = 1e-8
-    omega_min: float = 0.05
-    kappa: float = 0.0
-    tau_n: float = 1.0
     eval_split: str = "test"
     save_features: bool = True
     force_recompute_features: bool = False
@@ -138,8 +135,6 @@ class TaskRouter:
     task_name: str
     task_id: int
     gmm: WeightedDiagonalGMM
-    a: float   # weighted-mean log-likelihood on training set
-    b: float   # weighted-std  log-likelihood on training set
 
 
 class ResidualFitGMMRouter:
@@ -148,12 +143,13 @@ class ResidualFitGMMRouter:
         self.tasks: List[TaskRouter] = []
 
     def predict_scores(self, z: torch.Tensor) -> torch.Tensor:
-        """Normalised GMM scores s_k(z) for all tasks. Returns [N, K]."""
+        """MAP log-posterior scores s_k(z) = log p_k(z) + log(1/K). Returns [N, K]."""
+        K = len(self.tasks)
+        log_prior = math.log(1.0 / K)
         scores = []
         for tr in self.tasks:
             logp = tr.gmm.log_prob(z)
-            s = (logp - tr.a) / (tr.b + self.cfg.eps)
-            scores.append(s)
+            scores.append(logp + log_prior)
         return torch.stack(scores, dim=1)
 
     @classmethod
@@ -166,8 +162,6 @@ class ResidualFitGMMRouter:
                 task_name=item["task_name"],
                 task_id=int(item["task_id"]),
                 gmm=WeightedDiagonalGMM.from_dict(item["gmm"]),
-                a=float(item["a"]),
-                b=float(item["b"]),
             ))
         return router
 

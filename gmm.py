@@ -48,10 +48,7 @@ class RouterConfig:
     em_tol: float = 1e-4
     variance_floor: float = 1e-4
     eps: float = 1e-8
-    omega_min: float = 0.05
-    kappa: float = 0.0
-    tau_n: float = 1.0
-    eval_split: str = "test"  
+    eval_split: str = "test"
     save_features: bool = True
     force_recompute_features: bool = False
 
@@ -408,8 +405,6 @@ class TaskRouter:
     task_name: str
     task_id: int
     gmm: WeightedDiagonalGMM
-    a: float
-    b: float
 
 
 class ResidualFitGMMRouter:
@@ -417,30 +412,19 @@ class ResidualFitGMMRouter:
         self.cfg = cfg
         self.tasks: List[TaskRouter] = []
 
-    def _normalized_scores_for_existing_tasks(self, z: torch.Tensor) -> torch.Tensor:
+    def _scores_for_existing_tasks(self, z: torch.Tensor) -> torch.Tensor:
         if not self.tasks:
             raise RuntimeError("No old tasks available")
 
+        K = len(self.tasks)
+        log_prior = math.log(1.0 / K)
         scores = []
         for tr in self.tasks:
             logp = tr.gmm.log_prob(z)
-            s = (logp - tr.a) / (tr.b + self.cfg.eps)
-            scores.append(s)
-        return torch.stack(scores, dim=1)  # [N, K]
-
-    def novelty_weights(self, z: torch.Tensor) -> torch.Tensor:
-        if not self.tasks:
-            return torch.ones(z.shape[0], dtype=torch.float32)
-
-        old_scores = self._normalized_scores_for_existing_tasks(z)
-        coverage = old_scores.max(dim=1).values
-        novelty = 1.0 - torch.sigmoid((coverage - self.cfg.kappa) / self.cfg.tau_n)
-        novelty = torch.clamp(novelty, min=self.cfg.omega_min, max=1.0)
-        return novelty.float()
+            scores.append(logp + log_prior)
+        return torch.stack(scores, dim=1)
 
     def fit_new_task(self, task_name: str, task_id: int, z_train: torch.Tensor) -> TaskRouter:
-        w = self.novelty_weights(z_train)
-
         gmm = WeightedDiagonalGMM(
             n_components=self.cfg.gmm_components,
             variance_floor=self.cfg.variance_floor,
@@ -448,29 +432,19 @@ class ResidualFitGMMRouter:
         )
         gmm.fit(
             z_train,
-            sample_weights=w,
             em_iters=self.cfg.em_iters,
             tol=self.cfg.em_tol,
             seed=self.cfg.seed + task_id,
         )
 
-        logp = gmm.log_prob(z_train)
-        omega = w.sum().clamp_min(self.cfg.eps)
-        a = float((w * logp).sum() / omega)
-        b = float(torch.sqrt((w * (logp - a).pow(2)).sum() / omega + self.cfg.eps))
-
-        tr = TaskRouter(task_name=task_name, task_id=task_id, gmm=gmm, a=a, b=b)
+        tr = TaskRouter(task_name=task_name, task_id=task_id, gmm=gmm)
         self.tasks.append(tr)
 
-        print(
-            f"[fit] task={task_id}:{task_name} "
-            f"N={len(z_train)} omega_mean={float(w.mean()):.4f} "
-            f"a={a:.4f} b={b:.4f}"
-        )
+        print(f"[fit] task={task_id}:{task_name} N={len(z_train)}")
         return tr
 
     def predict_scores(self, z: torch.Tensor) -> torch.Tensor:
-        return self._normalized_scores_for_existing_tasks(z)
+        return self._scores_for_existing_tasks(z)
 
     def predict(self, z: torch.Tensor) -> torch.Tensor:
         scores = self.predict_scores(z)
@@ -487,8 +461,6 @@ class ResidualFitGMMRouter:
                 {
                     "task_name": tr.task_name,
                     "task_id": tr.task_id,
-                    "a": tr.a,
-                    "b": tr.b,
                     "gmm": tr.gmm.to_dict(),
                 }
                 for tr in self.tasks
@@ -507,8 +479,6 @@ class ResidualFitGMMRouter:
                     task_name=item["task_name"],
                     task_id=int(item["task_id"]),
                     gmm=WeightedDiagonalGMM.from_dict(item["gmm"]),
-                    a=float(item["a"]),
-                    b=float(item["b"]),
                 )
             )
         return router
@@ -803,10 +773,6 @@ def build_argparser() -> argparse.ArgumentParser:
     p.add_argument("--variance_floor", type=float, default=RouterConfig.variance_floor)
     p.add_argument("--eps", type=float, default=RouterConfig.eps)
 
-    p.add_argument("--omega_min", type=float, default=RouterConfig.omega_min)
-    p.add_argument("--kappa", type=float, default=RouterConfig.kappa)
-    p.add_argument("--tau_n", type=float, default=RouterConfig.tau_n)
-
     p.add_argument("--eval_split", type=str, default=RouterConfig.eval_split, choices=["validation", "test"])
     p.add_argument("--no_save_features", action="store_true")
     p.add_argument("--force_recompute_features", action="store_true")
@@ -835,9 +801,6 @@ def main() -> None:
         em_tol=args.em_tol,
         variance_floor=args.variance_floor,
         eps=args.eps,
-        omega_min=args.omega_min,
-        kappa=args.kappa,
-        tau_n=args.tau_n,
         eval_split=args.eval_split,
         save_features=not args.no_save_features,
         force_recompute_features=args.force_recompute_features,

@@ -19,8 +19,8 @@ stored either locally or in a HuggingFace Hub repo.  Each file has the schema:
       ]
     }
 
-Training mechanic is identical to gmm.py (ResidualFitGMMRouter with novelty
-weights) but the feature vectors come from encoding tracebacks, not prompts.
+Training mechanic is identical to gmm.py (ResidualFitGMMRouter with MAP scoring)
+but the feature vectors come from encoding tracebacks, not prompts.
 """
 
 from __future__ import annotations
@@ -73,9 +73,6 @@ class TracebackRouterConfig:
     em_tol: float = 1e-4
     variance_floor: float = 1e-3  # higher than code (1e-4) to prevent component collapse
     eps: float = 1e-8
-    omega_min: float = 0.05
-    kappa: float = 0.0
-    tau_n: float = 1.0
     save_features: bool = True
     force_recompute_features: bool = False
     # Traceback-specific
@@ -256,9 +253,6 @@ def _to_router_cfg(cfg: TracebackRouterConfig) -> RouterConfig:
         em_tol=cfg.em_tol,
         variance_floor=cfg.variance_floor,
         eps=cfg.eps,
-        omega_min=cfg.omega_min,
-        kappa=cfg.kappa,
-        tau_n=cfg.tau_n,
         save_features=cfg.save_features,
         force_recompute_features=cfg.force_recompute_features,
     )
@@ -389,9 +383,6 @@ def build_argparser() -> argparse.ArgumentParser:
     p.add_argument("--em_tol", type=float, default=d.em_tol)
     p.add_argument("--variance_floor", type=float, default=d.variance_floor)
     p.add_argument("--eps", type=float, default=d.eps)
-    p.add_argument("--omega_min", type=float, default=d.omega_min)
-    p.add_argument("--kappa", type=float, default=d.kappa)
-    p.add_argument("--tau_n", type=float, default=d.tau_n)
     p.add_argument("--no_save_features", action="store_true")
     p.add_argument("--force_recompute_features", action="store_true")
     # Traceback-specific
@@ -431,9 +422,6 @@ def main() -> None:
         em_tol=args.em_tol,
         variance_floor=args.variance_floor,
         eps=args.eps,
-        omega_min=args.omega_min,
-        kappa=args.kappa,
-        tau_n=args.tau_n,
         save_features=not args.no_save_features,
         force_recompute_features=args.force_recompute_features,
         results_source=args.results_source,

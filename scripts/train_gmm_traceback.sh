@@ -58,9 +58,6 @@ python gmm_traceback.py \
   --em_tol                1e-4 \
   --variance_floor        1e-3 \
   --eps                   1e-8 \
-  --omega_min             0.05 \
-  --kappa                 0.0 \
-  --tau_n                 1.0 \
   --truncate_side         left \
   --min_traceback_length  10 \
   --max_tracebacks        "$MAX_TRACEBACKS" \
