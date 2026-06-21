@@ -11,9 +11,8 @@ python gmm.py \
   --tasks           python,cpp,swift,rust,csharp,java,php,typescript,shell \
   --batch_size      16 \
   --train_k         5000 \
-  --eval_k          -1 \ 
+  --eval_k          -1 \
   --variance_floor  0.02 \
-  --eval_k          1000 \
   --routing_dim     256 \
   --gmm_components  4 \
   --feature_layers  4 \
