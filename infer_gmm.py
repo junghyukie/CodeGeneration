@@ -1025,7 +1025,7 @@ def main():
         ]
         if not hard_rows:
             print(f"[round2] No hard samples for {task}.")
-            return [], [], [], [], [], []
+            return [], [], [], [], [], [], []
 
         print(f"[round2] {len(hard_rows)} hard samples for {task} "
               f"(all predictions failed in previous round)")
