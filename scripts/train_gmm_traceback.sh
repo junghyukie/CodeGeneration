@@ -35,7 +35,7 @@ export HF_DATASETS_CACHE=./.cache
 : "${RESULTS_SOURCE:=hf_hub}"
 : "${RESULTS_DIR:=ankhanhtran02/executed_calibration_results}"
 : "${RESULTS_REPO_TYPE:=model}"
-: "${OUTPUT_DIR:=./router_gmm_traceback_ckpt}"
+: "${OUTPUT_DIR:=./router/router_gmm_traceback_ckpt}"
 : "${TASKS:=python,cpp,swift,rust,csharp,java,php,typescript,shell}"
 : "${MAX_TRACEBACKS:=0}"
 : "${CUDA_DEVICES:=2}"
@@ -50,9 +50,9 @@ python gmm_traceback.py \
   --output_dir            "$OUTPUT_DIR" \
   --tasks                 "$TASKS" \
   --feature_layers        4 \
-  --routing_dim           128 \
+  --routing_dim           256 \
   --max_length            256 \
-  --batch_size            32 \
+  --batch_size            64 \
   --gmm_components        4 \
   --em_iters              100 \
   --em_tol                1e-4 \
