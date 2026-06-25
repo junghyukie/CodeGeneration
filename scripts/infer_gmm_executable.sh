@@ -19,7 +19,7 @@ python infer_gmm.py \
   --model_name_or_path   Qwen/Qwen2.5-Coder-1.5B \
   --base_path            ankhanhtran02/lora-per-task-executable-start-4 \
   --inference_model_path "python/0","cpp/0","swift/0","rust/0","csharp/0","java/0","php/0","typescript/0","shell/0" \
-  --router_weight_path   ./router_exe/router_gmm_exe_vf0.02_dim_256_comp_4_omega_1.0_layer_4 \
+  --router_weight_path   router/ckpt_executable_dim256_comp4_vf0.001_mean \
   --benchmark            executable \
   --routing_mode         "${ROUTING_MODE}" \
   --routing_temperature  1.0 \
