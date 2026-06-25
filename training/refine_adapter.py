@@ -301,6 +301,8 @@ def parse_args():
     parser.add_argument("--max_ans_len", type=int, default=1024)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--logging_steps", type=int, default=5)
+    parser.add_argument("--max_samples", type=int, default=None,
+                        help="Maximum number of repair samples to use for training.")
 
     # ── System ──────────────────────────────────────────────────────────────
     parser.add_argument("--local_rank", type=int, default=-1)
@@ -413,6 +415,8 @@ def main():
         args.results_dir, args.language, args.results_source, args.results_repo_type
     )
     repair_samples = extract_repair_samples(predictions)
+    if args.max_samples is not None and len(repair_samples) > args.max_samples:
+        repair_samples = repair_samples[:args.max_samples]
     print_rank_0(
         f"[refine] {len(repair_samples)} repair pairs for language={args.language}",
         args.global_rank,

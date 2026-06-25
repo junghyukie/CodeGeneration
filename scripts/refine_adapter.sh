@@ -79,7 +79,8 @@ for lang in "${LANGUAGES[@]}"; do
       --run_name                    "refine_${lang}" \
       --group_name                  "refine_adapter" \
       --logging_steps               5 \
-      --seed                        42
+      --seed                        42 \
+      --max_samples                 600
 
   echo "[refine] Done. Adapter saved to $OUTPUT_DIR"
 done
