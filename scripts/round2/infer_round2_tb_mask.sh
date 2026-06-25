@@ -25,7 +25,7 @@ export HF_DATASETS_CACHE=./.cache
 
 : "${MODEL:=Qwen/Qwen2.5-Coder-1.5B}"
 : "${BASE_PATH:=ankhanhtran02/lora-per-task-executable-start-4}"
-: "${ROUTER_PATH:=./router_exe/router_gmm_exe_vf0.02_dim_256_comp_4_omega_1.0_layer_4}"
+: "${ROUTER_PATH:=router/ckpt_executable_dim256_comp4_vf0.001_mean}"
 : "${PREV_RESULTS_DIR:=ankhanhtran02/gmm_exe_vf0.02_dim256_comp4_omega1.0_soft_temp_1.0_executed}"
 : "${PREV_RESULTS_SOURCE:=hf_hub}"
 : "${TB_ROUTER_PATH:=./router_gmm_traceback_ckpt}"
@@ -41,7 +41,7 @@ set -euo pipefail
 mkdir -p "$OUTPUT_DIR"
 
 ADAPTER_PATHS=$(echo "$TASKS" | tr ',' '\n' | awk '{print $1"/0"}' | paste -sd ',' -)
-MAX_PROMPT_LENS="1024,1024,1024,1024,1024,1024,1024,1024,1024"
+MAX_PROMPT_LENS="4096,4096,4096,4096,4096,4096,4096,4096,4096"
 MAX_ANS_LENS="2048,2048,2048,2048,2048,2048,2048,2048,2048"
 
 echo "[round2_tb_mask] ============================================"

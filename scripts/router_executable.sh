@@ -6,7 +6,7 @@ export CUDA_VISIBLE_DEVICES
 
 python gmm.py \
   --model_name      Qwen/Qwen2.5-Coder-1.5B \
-  --output_dir      ./router/router_gmm_exe_vf0.02_dim_256_comp_4_layer_4 \
+  --output_dir      router/ckpt_executable_dim256_comp4_vf0.001_mean \
   --dataset_source  executable \
   --tasks           python,cpp,swift,rust,csharp,java,php,typescript,shell \
   --batch_size      16 \

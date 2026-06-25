@@ -503,6 +503,11 @@ def parse_args():
         '--routing_temperature', type=float, default=1.0,
         help='Softmax temperature τ for soft routing (ignored in hard mode)',
     )
+    parser.add_argument(
+        '--routing_top_p', type=float, default=1.0,
+        help='Top-p truncation for soft routing weights: keep fewest top tasks whose '
+             'cumulative weight <= routing_top_p, then renormalize. 1.0 = no truncation.',
+    )
     # Shared with infer_anyssr_total.py
     parser.add_argument('--max_prompt_len', type=list_of_strings,
                         default='320,320,256,130,512,256,256,256')
@@ -741,6 +746,22 @@ def main():
             alpha[k_hat] = 1.0
         else:
             alpha = F.softmax(scores / args.routing_temperature, dim=0)
+            if args.routing_top_p < 1.0:
+                sorted_alpha, sorted_idx = torch.sort(alpha, descending=True)
+                # If the top task alone already meets the threshold, keep only it
+                if sorted_alpha[0].item() >= args.routing_top_p:
+                    mask = torch.zeros_like(alpha)
+                    mask[sorted_idx[0]] = 1.0
+                    alpha = mask
+                else:
+                    cumsum = torch.cumsum(sorted_alpha, dim=0)
+                    # Keep fewest tasks whose cumulative weight <= routing_top_p
+                    n_keep = int((cumsum <= args.routing_top_p).sum().item())
+                    n_keep = max(n_keep, 1)
+                    keep_idx = sorted_idx[:n_keep]
+                    mask = torch.zeros_like(alpha)
+                    mask[keep_idx] = alpha[keep_idx]
+                    alpha = mask / mask.sum()
             k_hat = int(alpha.argmax().item())
 
         return k_hat, alpha, scores
