@@ -62,7 +62,7 @@ for language in php typescript shell; do
       --benchmark           executable \
       --CL_method           anamoe \
       --dataset_name        "$language" \
-      --max_prompt_len      1024 \
+      --max_prompt_len      2048 \
       --max_ans_len         2048 \
       --num_train           1 \
       --num_eval            -1 \

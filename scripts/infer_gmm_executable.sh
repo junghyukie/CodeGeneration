@@ -23,7 +23,7 @@ python infer_gmm.py \
   --benchmark            executable \
   --routing_mode         "${ROUTING_MODE}" \
   --routing_temperature  1.0 \
-  --max_prompt_len       1024,1024,1024,1024,1024,1024,1024,1024,1024 \
+  --max_prompt_len       2048,2048,2048,2048,2048,2048,2048,2048,2048 \
   --max_ans_len          2048,2048,2048,2048,2048,2048,2048,2048,2048 \
   --inference_batch      1 \
   --inference_tasks      python,cpp,swift,rust,csharp,java,php,typescript,shell \

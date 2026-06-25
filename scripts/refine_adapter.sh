@@ -72,7 +72,7 @@ for lang in "${LANGUAGES[@]}"; do
       --num_train_epochs            3 \
       --learning_rate               5e-5 \
       --weight_decay                0.01 \
-      --max_prompt_len              1024 \
+      --max_prompt_len              4096 \
       --max_ans_len                 2048 \
       --zero_stage                  "$ZERO_STAGE" \
       --deepspeed \

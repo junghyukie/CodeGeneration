@@ -8,7 +8,7 @@ set -euo pipefail
 port=$(shuf -i25000-30000 -n1)
 
 # Executable benchmark tasks: python, cpp, swift, rust, csharp, java, php, typescript, shell
-# Using max_prompt_len=1024 and max_new_tokens=2048 for all tasks.
+# Using max_prompt_len=2048 and max_new_tokens=2048 for all tasks.
 
 for dataset in python cpp swift rust csharp java php typescript shell; do
   deepspeed --master_port "$port" training/main_anamoe.py \
@@ -19,7 +19,7 @@ for dataset in python cpp swift rust csharp java php typescript shell; do
     --per_device_train_batch_size 1 \
     --per_device_eval_batch_size 16 \
     --gradient_accumulation_steps 11 \
-    --max_prompt_len 1024 \
+    --max_prompt_len 2048 \
     --max_ans_len 2048 \
     --learning_rate 1e-4 \
     --num_train_epochs 3 \

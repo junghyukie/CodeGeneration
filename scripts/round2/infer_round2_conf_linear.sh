@@ -41,7 +41,7 @@ set -euo pipefail
 mkdir -p "$OUTPUT_DIR"
 
 ADAPTER_PATHS=$(echo "$TASKS" | tr ',' '\n' | awk '{print $1"/0"}' | paste -sd ',' -)
-MAX_PROMPT_LENS="1024,1024,1024,1024,1024,1024,1024,1024,1024"
+MAX_PROMPT_LENS="4096,4096,4096,4096,4096,4096,4096,4096,4096"
 MAX_ANS_LENS="2048,2048,2048,2048,2048,2048,2048,2048,2048"
 
 echo "[round2_conf_linear] ============================================"
