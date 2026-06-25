@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-CUDA_VISIBLE_DEVICES=1
+CUDA_VISIBLE_DEVICES=0
 export CUDA_VISIBLE_DEVICES
 
 OUTPUT_DIR="router/ckpt_executable_dim256_comp4_vf0.001_mean"
