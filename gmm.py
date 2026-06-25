@@ -471,7 +471,9 @@ class ResidualFitGMMRouter:
     @classmethod
     def load(cls, path: str | Path) -> "ResidualFitGMMRouter":
         payload = torch.load(path, map_location="cpu")
-        cfg = RouterConfig(**payload["cfg"])
+        known = {f.name for f in RouterConfig.__dataclass_fields__.values()}
+        cfg_dict = {k: v for k, v in payload["cfg"].items() if k in known}
+        cfg = RouterConfig(**cfg_dict)
         router = cls(cfg)
         for item in payload["tasks"]:
             router.tasks.append(
@@ -680,7 +682,7 @@ def print_eval(step: int, seen_tasks: List[str], result: EvalResult) -> None:
     print("=" * 90 + "\n")
 
 
-def run(cfg: RouterConfig) -> None:
+def run(cfg: RouterConfig, resume_from: Optional[str] = None) -> None:
     set_seed(cfg.seed)
     output_dir = ensure_dir(cfg.output_dir)
 
@@ -703,11 +705,26 @@ def run(cfg: RouterConfig) -> None:
     )
     extractor.save_projection(output_dir)
 
-    router = ResidualFitGMMRouter(cfg)
+    if resume_from is not None:
+        print(f"[resume] loading router from {resume_from}")
+        router = ResidualFitGMMRouter.load(resume_from)
+        start_task_id = len(router.tasks)
+        print(f"[resume] resuming from task_id={start_task_id} ({cfg.tasks[start_task_id] if start_task_id < len(cfg.tasks) else 'done'})")
+    else:
+        router = ResidualFitGMMRouter(cfg)
+        start_task_id = 0
 
-    all_results: Dict[str, Dict] = {}
+    results_path = output_dir / "routing_results.json"
+    if results_path.exists():
+        with open(results_path, encoding="utf-8") as f:
+            all_results: Dict[str, Dict] = json.load(f)
+    else:
+        all_results = {}
 
     for task_id, task in enumerate(cfg.tasks):
+        if task_id < start_task_id:
+            print(f"[continual] skip task {task_id}: {task} (already in checkpoint)")
+            continue
         print("\n" + "#" * 90)
         print(f"[continual] learn task {task_id}: {task}")
         print("#" * 90)
@@ -776,6 +793,7 @@ def build_argparser() -> argparse.ArgumentParser:
     p.add_argument("--eval_split", type=str, default=RouterConfig.eval_split, choices=["validation", "test"])
     p.add_argument("--no_save_features", action="store_true")
     p.add_argument("--force_recompute_features", action="store_true")
+    p.add_argument("--resume_from", type=str, default=None, help="Path to a router_stepN.pt checkpoint to resume from.")
     return p
 
 
@@ -805,7 +823,7 @@ def main() -> None:
         save_features=not args.no_save_features,
         force_recompute_features=args.force_recompute_features,
     )
-    run(cfg)
+    run(cfg, resume_from=args.resume_from)
 
 
 if __name__ == "__main__":
