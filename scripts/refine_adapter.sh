@@ -27,7 +27,7 @@ export HF_HOME=./.cache
 export HF_DATASETS_CACHE=./.cache
 
 : "${MODEL:=Qwen/Qwen2.5-Coder-1.5B}"
-: "${LANG_ID:=php,typescript,shell}"
+: "${LANG_ID:=python,cpp,swift,rust,csharp,java,php,typescript,shell}"
 : "${ADAPTER_PATH:=ankhanhtran02/lora-per-task-executable-start-4}"
 : "${RESULTS_SOURCE:=hf_hub}"
 : "${RESULTS_DIR:=ankhanhtran02/executed_calibration_results}"
