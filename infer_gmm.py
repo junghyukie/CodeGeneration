@@ -555,7 +555,7 @@ def parse_args():
     parser.add_argument(
         '--round2_routing_method', type=str, default=None,
         choices=['poe', 'conf_linear', 'disagree_explore', 'geo_interp',
-                 'tb_mask', 'hard_poe', 'conf_gate'],
+                 'tb_mask', 'hard_poe', 'conf_gate', 'hard_tb_only', 'soft_tb_only'],
         help='How to combine input-router and traceback-router distributions:\n'
              '  poe              — softmax(s_in/T_in + s_tr/T_tr) [requires --round2_T_input, --round2_T_trace]\n'
              '  conf_linear      — confidence-weighted linear blend\n'
@@ -563,7 +563,9 @@ def parse_args():
              '  geo_interp       — geometric interpolation [requires --round2_alpha]\n'
              '  tb_mask          — mask input weights by traceback plausibility\n'
              '  hard_poe         — argmax(s_in + s_tr) [hard routing]\n'
-             '  conf_gate        — use traceback router when confident [requires --conf_gate_threshold]',
+             '  conf_gate        — use traceback router when confident [requires --conf_gate_threshold]\n'
+             '  hard_tb_only     — argmax of traceback-router scores only (ignores input router)\n'
+             '  soft_tb_only     — softmax(s_tr/τ) of traceback-router scores only (ignores input router)',
     )
     parser.add_argument(
         '--round2_T_input', type=float, default=None,
@@ -982,7 +984,7 @@ def main():
 
     is_round2_mode = args.prev_results_dir is not None
 
-    _SOFT_METHODS = {"poe", "conf_linear", "disagree_explore", "geo_interp", "tb_mask"}
+    _SOFT_METHODS = {"poe", "conf_linear", "disagree_explore", "geo_interp", "tb_mask", "soft_tb_only"}
 
     if is_round2_mode:
         if args.round2_routing_method is None:
@@ -1105,6 +1107,22 @@ def main():
                     w_combined = _soft_disagree_explore(in_scores, tb_scores, w_input, w_trace)
                 elif method == "geo_interp":
                     w_combined = _soft_geo_interp(w_input, w_trace, args.round2_alpha)
+                elif method == "soft_tb_only":
+                    w_combined = F.softmax(tb_scores / args.routing_temperature, dim=0)
+                    if args.routing_top_p < 1.0:
+                        sorted_alpha, sorted_idx = torch.sort(w_combined, descending=True)
+                        if sorted_alpha[0].item() >= args.routing_top_p:
+                            mask = torch.zeros_like(w_combined)
+                            mask[sorted_idx[0]] = 1.0
+                            w_combined = mask
+                        else:
+                            cumsum = torch.cumsum(sorted_alpha, dim=0)
+                            n_keep = int((cumsum <= args.routing_top_p).sum().item())
+                            n_keep = max(n_keep, 1)
+                            keep_idx = sorted_idx[:n_keep]
+                            mask = torch.zeros_like(w_combined)
+                            mask[keep_idx] = w_combined[keep_idx]
+                            w_combined = mask / mask.sum()
                 else:  # tb_mask
                     w_combined = _soft_tb_mask(w_input, w_trace)
 
@@ -1141,6 +1159,8 @@ def main():
 
                 if method == "hard_poe":
                     k_hat = _hard_poe(in_scores, tb_scores)
+                elif method == "hard_tb_only":
+                    k_hat = int(tb_scores.argmax().item())
                 else:  # conf_gate
                     k_hat = _hard_conf_gate(in_scores, w_trace, args.conf_gate_threshold)
 
