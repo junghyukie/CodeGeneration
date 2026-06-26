@@ -155,7 +155,8 @@ class ResidualFitGMMRouter:
     @classmethod
     def load(cls, path: str) -> "ResidualFitGMMRouter":
         payload = torch.load(path, map_location="cpu")
-        cfg = RouterConfig(**payload["cfg"])
+        known = {f.name for f in RouterConfig.__dataclass_fields__.values()}
+        cfg = RouterConfig(**{k: v for k, v in payload["cfg"].items() if k in known})
         router = cls(cfg)
         for item in payload["tasks"]:
             router.tasks.append(TaskRouter(
