@@ -3,7 +3,7 @@
 # Infers all tasks seen through step 5: python,cpp,swift,rust,csharp,java
 #
 # Usage:
-#   bash scripts/executable/round1/infer_gmm_executable_topp0.9_step5.sh [soft|hard]
+#   bash scripts/executable/round1/step5.sh [soft|hard]
 #
 # The first argument selects the routing mode (default: soft).
 
@@ -29,9 +29,9 @@ python infer_gmm.py \
   --do_sample \
   --temperature          0.2 \
   --top_p                0.95 \
-  --routing_top_p        0.9 \
+  --routing_top_p        1.0 \
   --top_k                0 \
   --num_return_sequences 5 \
   --repetition_penalty   1.0 \
   --seed                 42 \
-  --inference_output_path ./inference_results/gmm_exe_vf0.02_dim256_comp4_omega1.0_"${ROUTING_MODE}_temp_1.0_routing_topp0.9/step_5"
+  --inference_output_path inference_results/gmm_exe_vf0.02_dim256_comp4_omega1.0_soft_temp_1.0/step_5
