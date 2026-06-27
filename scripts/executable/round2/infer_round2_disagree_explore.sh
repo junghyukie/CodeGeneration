@@ -74,8 +74,6 @@ python infer_gmm.py \
   --prev_results_subfolder step_8 \
   --round_num             "$ROUND_NUM" \
   --traceback_router_path "$TB_ROUTER_PATH" \
-  --round2_routing_method disagree_explore \
-  --routing_top_p         1 \
   --pass_through_correct \
   --pad_predictions_to    5
 
