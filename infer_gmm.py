@@ -38,7 +38,19 @@ from transformers import (
     AutoTokenizer,
     GenerationConfig,
 )
-from peft import PeftModel
+from peft import PeftModel, PeftConfig
+
+# Older PEFT versions lack a local-file fallback in _get_peft_type; patch it in.
+_orig_get_peft_type = PeftConfig._get_peft_type.__func__
+
+@classmethod  # type: ignore[misc]
+def _patched_get_peft_type(cls, model_id, subfolder=None, **kwargs):
+    config_path = os.path.join(model_id, subfolder or "", "adapter_config.json")
+    if os.path.isfile(config_path):
+        return cls.from_json_file(config_path)["peft_type"]
+    return _orig_get_peft_type(cls, model_id, subfolder=subfolder, **kwargs)
+
+PeftConfig._get_peft_type = _patched_get_peft_type
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.pardir)))
 from utils.data.data_collator import DataCollator
