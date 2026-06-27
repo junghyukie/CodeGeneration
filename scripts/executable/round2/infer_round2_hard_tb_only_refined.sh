@@ -33,9 +33,9 @@ export HF_DATASETS_CACHE=./.cache
 : "${PREV_RESULTS_DIR:=ankhanhtran02/gmm_exe_vf0.02_dim256_comp4_omega1.0_soft_temp_1.0_executed}"
 : "${PREV_RESULTS_SOURCE:=hf_hub}"
 : "${TB_ROUTER_PATH:=router/router_gmm_traceback_ckpt}"
-: "${OUTPUT_DIR:=./inference_results/round2_hard_tb_refined_only_routing_topp_1.0/step_8}"
+: "${OUTPUT_DIR:=./inference_results/round2_hard_tb_only_refined_routing_topp_1.0/step_8}"
 : "${TASKS:=python,cpp,swift,rust,csharp,java,php,typescript,shell}"
-: "${CUDA_DEVICE:=1}"
+: "${CUDA_DEVICE:=6}"
 : "${ROUND_NUM:=2}"
 
 export CUDA_VISIBLE_DEVICES="$CUDA_DEVICE"

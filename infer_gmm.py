@@ -263,11 +263,6 @@ _REFINE_PROMPT_TEMPLATE = (
 
 # ── Routing combination helpers ───────────────────────────────────────────────
 
-def _entropy(w: torch.Tensor, eps: float = 1e-8) -> float:
-    """Shannon entropy of a probability distribution."""
-    return float(-(w.clamp_min(eps) * w.clamp_min(eps).log()).sum().item())
-
-
 def _align_traceback_scores(
     tb_scores: torch.Tensor,
     tb_task_names: List[str],
@@ -284,27 +279,6 @@ def _align_traceback_scores(
         if name in tb_idx:
             aligned[in_idx] = tb_scores[tb_idx[name]]
     return aligned
-
-
-def _soft_poe(
-    s_input: torch.Tensor, s_trace: torch.Tensor, T_in: float, T_tr: float
-) -> torch.Tensor:
-    """Product of Experts: softmax(s_input/T_in + s_trace/T_tr)."""
-    return F.softmax(s_input / T_in + s_trace / T_tr, dim=0)
-
-
-def _soft_conf_linear(
-    w_input: torch.Tensor, w_trace: torch.Tensor, eps: float = 1e-8
-) -> torch.Tensor:
-    """Confidence-weighted linear blend.
-
-    α = conf_trace / (conf_input + conf_trace),  conf = 1 / (H + ε).
-    Higher confidence (lower entropy) router gets more weight.
-    """
-    conf_in = 1.0 / (_entropy(w_input, eps) + eps)
-    conf_tr = 1.0 / (_entropy(w_trace, eps) + eps)
-    alpha = conf_tr / (conf_in + conf_tr)
-    return (1.0 - alpha) * w_input + alpha * w_trace
 
 
 def _soft_disagree_explore(
@@ -330,56 +304,6 @@ def _soft_disagree_explore(
     return (1.0 - js) * w_posterior + js * w_uniform
 
 
-def _soft_geo_interp(
-    w_input: torch.Tensor, w_trace: torch.Tensor, alpha: float, eps: float = 1e-8
-) -> torch.Tensor:
-    """Geometric interpolation in log-probability space.
-
-    log_w = (1-α)*log(w_input) + α*log(w_trace); w = softmax(log_w).
-    Equivalent to a Bayesian product-of-experts with exponent α.
-    """
-    log_w = (
-        (1.0 - alpha) * w_input.clamp_min(eps).log()
-        + alpha * w_trace.clamp_min(eps).log()
-    )
-    return F.softmax(log_w, dim=0)
-
-
-def _soft_tb_mask(w_input: torch.Tensor, w_trace: torch.Tensor) -> torch.Tensor:
-    """Traceback-guided adapter masking.
-
-    Exclude adapters where the traceback distribution is below 1/(2K)
-    (i.e. the traceback router considers them implausible), then
-    renormalise the input-router weights over the remaining adapters.
-    """
-    K = w_input.shape[0]
-    mask = (w_trace > 1.0 / (2 * K)).float()
-    if mask.sum() == 0:
-        mask = torch.ones(K, dtype=torch.float32)   # fallback: keep all
-    w_masked = w_input * mask
-    return w_masked / w_masked.sum()
-
-
-def _hard_poe(s_input: torch.Tensor, s_trace: torch.Tensor) -> int:
-    """Hard Product of Experts: argmax of summed raw z-scores."""
-    return int((s_input + s_trace).argmax().item())
-
-
-def _hard_conf_gate(
-    s_input: torch.Tensor,
-    w_trace: torch.Tensor,
-    threshold: float,
-    eps: float = 1e-8,
-) -> int:
-    """Confidence gate: use traceback router when it is confident enough.
-
-    conf = max(p_trace) - entropy(p_trace).
-    Positive conf means the distribution is peaked; negative means flat.
-    """
-    conf = float(w_trace.max().item()) - _entropy(w_trace, eps)
-    if conf > threshold:
-        return int(w_trace.argmax().item())
-    return int(s_input.argmax().item())
 
 
 # ── Traceback feature extractor ───────────────────────────────────────────────
@@ -552,40 +476,6 @@ def parse_args():
         '--traceback_router_step', type=int, default=None,
         help='Which router_step{N}.pt to load from traceback_router_path. '
              'Defaults to the last continual step (i).',
-    )
-    parser.add_argument(
-        '--round2_routing_method', type=str, default=None,
-        choices=['poe', 'conf_linear', 'disagree_explore', 'geo_interp',
-                 'tb_mask', 'hard_poe', 'conf_gate', 'hard_tb_only', 'soft_tb_only'],
-        help='How to combine input-router and traceback-router distributions:\n'
-             '  poe              — softmax(s_in/T_in + s_tr/T_tr) [requires --round2_T_input, --round2_T_trace]\n'
-             '  conf_linear      — confidence-weighted linear blend\n'
-             '  disagree_explore — JSD-gated posterior + uniform\n'
-             '  geo_interp       — geometric interpolation [requires --round2_alpha]\n'
-             '  tb_mask          — mask input weights by traceback plausibility\n'
-             '  hard_poe         — argmax(s_in + s_tr) [hard routing]\n'
-             '  conf_gate        — use traceback router when confident [requires --conf_gate_threshold]\n'
-             '  hard_tb_only     — argmax of traceback-router scores only (ignores input router)\n'
-             '  soft_tb_only     — softmax(s_tr/τ) of traceback-router scores only (ignores input router)',
-    )
-    parser.add_argument(
-        '--round2_T_input', type=float, default=None,
-        help='[poe] Temperature for input-router scores (lower → sharper).',
-    )
-    parser.add_argument(
-        '--round2_T_trace', type=float, default=None,
-        help='[poe] Temperature for traceback-router scores (lower → sharper).',
-    )
-    parser.add_argument(
-        '--round2_alpha', type=float, default=None,
-        help='[geo_interp] Interpolation weight α ∈ [0, 1] given to the '
-             'traceback router (0 = pure input router, 1 = pure traceback router).',
-    )
-    parser.add_argument(
-        '--conf_gate_threshold', type=float, default=None,
-        help='[conf_gate] Confidence threshold above which the traceback router '
-             'takes over. conf = max(p_trace) - entropy(p_trace). '
-             'Typical range: -0.5 to 0.5.',
     )
     parser.add_argument(
         '--prev_results_source', type=str, default='local', choices=['local', 'hf_hub'],
@@ -985,39 +875,11 @@ def main():
 
     is_round2_mode = args.prev_results_dir is not None
 
-    _SOFT_METHODS = {"poe", "conf_linear", "disagree_explore", "geo_interp", "tb_mask", "soft_tb_only"}
-
     if is_round2_mode:
-        if args.round2_routing_method is None:
-            raise ValueError("--round2_routing_method is required when --prev_results_dir is set.")
         if args.traceback_router_path is None:
             raise ValueError("--traceback_router_path is required when --prev_results_dir is set.")
         if args.benchmark != "executable":
             raise ValueError("Iterative refinement only supports --benchmark executable.")
-
-        method = args.round2_routing_method
-        if method == "poe":
-            if args.round2_T_input is None or args.round2_T_trace is None:
-                raise ValueError("[poe] requires --round2_T_input and --round2_T_trace.")
-            print(f"[round2] poe: T_input={args.round2_T_input}  T_trace={args.round2_T_trace}")
-        elif method == "geo_interp":
-            if args.round2_alpha is None:
-                raise ValueError("[geo_interp] requires --round2_alpha.")
-            print(f"[round2] geo_interp: alpha={args.round2_alpha}")
-        elif method == "conf_gate":
-            if args.conf_gate_threshold is None:
-                raise ValueError("[conf_gate] requires --conf_gate_threshold.")
-            print(f"[round2] conf_gate: threshold={args.conf_gate_threshold}")
-        else:
-            # methods with no extra required args — print any that were set
-            if args.round2_T_input is not None:
-                print(f"[round2] round2_T_input={args.round2_T_input} (ignored by {method})")
-            if args.round2_T_trace is not None:
-                print(f"[round2] round2_T_trace={args.round2_T_trace} (ignored by {method})")
-            if args.round2_alpha is not None:
-                print(f"[round2] round2_alpha={args.round2_alpha} (ignored by {method})")
-            if args.conf_gate_threshold is not None:
-                print(f"[round2] conf_gate_threshold={args.conf_gate_threshold} (ignored by {method})")
 
         tb_step = args.traceback_router_step if args.traceback_router_step is not None else i
         tb_router_file = _load_router_file(args.traceback_router_path, f"router_step{tb_step}.pt")
@@ -1030,7 +892,7 @@ def main():
         tb_task_names = [tr.task_name for tr in tb_router.tasks]
         in_task_names = [tr.task_name for tr in router.tasks]
         print(f"[round2] Traceback router: {len(tb_router.tasks)} tasks {tb_task_names}")
-        print(f"[round2] Method: {method}  Round: {args.round_num}")
+        print(f"[round2] Method: disagree_explore  Round: {args.round_num}")
 
     # ── Round-2 generation helper ──────────────────────────────────────────────
 
@@ -1091,102 +953,38 @@ def main():
             else:
                 tb_scores = torch.zeros(len(router.tasks), dtype=torch.float32)
 
-            # Compute combined weights
-            method = args.round2_routing_method
-            is_soft = method in _SOFT_METHODS
+            # Compute combined weights via JSD-gated posterior + uniform
+            w_input = F.softmax(in_scores / args.routing_temperature, dim=0)
+            w_trace = F.softmax(tb_scores, dim=0)
+            w_combined = _soft_disagree_explore(in_scores, tb_scores, w_input, w_trace)
 
-            if is_soft:
-                w_input = F.softmax(in_scores / args.routing_temperature, dim=0)
-                w_trace = F.softmax(tb_scores, dim=0)
+            # Build refine prompt and tokenise
+            prompt = _REFINE_PROMPT_TEMPLATE.format(
+                language=task,
+                instruction=src,
+                buggy_code=first_buggy,
+                traceback=first_tb,
+            )
+            enc = tokenizer(
+                [prompt],
+                padding="longest",
+                truncation=True,
+                max_length=int(args.max_prompt_len[task_idx]),
+                return_tensors="pt",
+            )
+            input_ids   = enc["input_ids"].to(device)
+            attn_mask   = enc["attention_mask"].to(device)
+            prompt_len  = input_ids.shape[1]
 
-                if method == "poe":
-                    w_combined = _soft_poe(in_scores, tb_scores,
-                                           args.round2_T_input, args.round2_T_trace)
-                elif method == "conf_linear":
-                    w_combined = _soft_conf_linear(w_input, w_trace)
-                elif method == "disagree_explore":
-                    w_combined = _soft_disagree_explore(in_scores, tb_scores, w_input, w_trace)
-                elif method == "geo_interp":
-                    w_combined = _soft_geo_interp(w_input, w_trace, args.round2_alpha)
-                elif method == "soft_tb_only":
-                    w_combined = F.softmax(tb_scores / args.routing_temperature, dim=0)
-                    if args.routing_top_p < 1.0:
-                        sorted_alpha, sorted_idx = torch.sort(w_combined, descending=True)
-                        if sorted_alpha[0].item() >= args.routing_top_p:
-                            mask = torch.zeros_like(w_combined)
-                            mask[sorted_idx[0]] = 1.0
-                            w_combined = mask
-                        else:
-                            cumsum = torch.cumsum(sorted_alpha, dim=0)
-                            n_keep = int((cumsum <= args.routing_top_p).sum().item())
-                            n_keep = max(n_keep, 1)
-                            keep_idx = sorted_idx[:n_keep]
-                            mask = torch.zeros_like(w_combined)
-                            mask[keep_idx] = w_combined[keep_idx]
-                            w_combined = mask / mask.sum()
-                else:  # tb_mask
-                    w_combined = _soft_tb_mask(w_input, w_trace)
-
-                # Build refine prompt and tokenise
-                prompt = _REFINE_PROMPT_TEMPLATE.format(
-                    language=task,
-                    instruction=src,
-                    buggy_code=first_buggy,
-                    traceback=first_tb,
-                )
-                enc = tokenizer(
-                    [prompt],
-                    padding="longest",
-                    truncation=True,
-                    max_length=int(args.max_prompt_len[task_idx]),
-                    return_tensors="pt",
-                )
-                input_ids   = enc["input_ids"].to(device)
-                attn_mask   = enc["attention_mask"].to(device)
-                prompt_len  = input_ids.shape[1]
-
-                gen_ids = _generate_soft(
-                    input_ids, attn_mask, w_combined, pad_token_id,
-                    int(args.max_ans_len[task_idx]), greedy_cfg,
-                )
-                k_hat = int(w_combined.argmax().item())
-                moe_id = {
-                    router.tasks[k].task_name: round(float(w_combined[k]), 4)
-                    for k in range(len(router.tasks))
-                }
-
-            else:  # hard routing
-                w_trace = F.softmax(tb_scores, dim=0)
-
-                if method == "hard_poe":
-                    k_hat = _hard_poe(in_scores, tb_scores)
-                elif method == "hard_tb_only":
-                    k_hat = int(tb_scores.argmax().item())
-                else:  # conf_gate
-                    k_hat = _hard_conf_gate(in_scores, w_trace, args.conf_gate_threshold)
-
-                prompt = _REFINE_PROMPT_TEMPLATE.format(
-                    language=task,
-                    instruction=src,
-                    buggy_code=first_buggy,
-                    traceback=first_tb,
-                )
-                enc = tokenizer(
-                    [prompt],
-                    padding="longest",
-                    truncation=True,
-                    max_length=int(args.max_prompt_len[task_idx]),
-                    return_tensors="pt",
-                )
-                input_ids   = enc["input_ids"].to(device)
-                attn_mask   = enc["attention_mask"].to(device)
-                prompt_len  = input_ids.shape[1]
-
-                gen_ids = _generate_hard(
-                    input_ids, attn_mask, k_hat, pad_token_id,
-                    int(args.max_ans_len[task_idx]), greedy_cfg,
-                )
-                moe_id = str(router.tasks[k_hat].task_id)
+            gen_ids = _generate_soft(
+                input_ids, attn_mask, w_combined, pad_token_id,
+                int(args.max_ans_len[task_idx]), greedy_cfg,
+            )
+            k_hat = int(w_combined.argmax().item())
+            moe_id = {
+                router.tasks[k].task_name: round(float(w_combined[k]), 4)
+                for k in range(len(router.tasks))
+            }
 
             seqs = tokenizer.batch_decode(
                 gen_ids[:, prompt_len:],
@@ -1243,7 +1041,7 @@ def main():
             prev_preds = prev_data.get("predictions", prev_data) if isinstance(prev_data, dict) else prev_data
 
             print(f"\n***** Round {args.round_num} step {i}: task {task} "
-                  f"[{args.round2_routing_method} routing] *****")
+                  f"[disagree_explore routing] *****")
             hard_src, hard_pred, hard_gt, hard_moe, hard_in_sc, hard_tb_sc, hard_prompts = prediction_round2(
                 prev_preds, task_idx, task
             )
