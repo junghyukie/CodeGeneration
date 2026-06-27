@@ -31,7 +31,7 @@ export HF_DATASETS_CACHE=./.cache
 : "${TB_ROUTER_PATH:=./router_gmm_traceback_ckpt}"
 : "${OUTPUT_DIR:=./inference_results/round2_conf_linear/step_8}"
 : "${TASKS:=python,cpp,swift,rust,csharp,java,php,typescript,shell}"
-: "${CUDA_DEVICE:=0}"
+: "${CUDA_DEVICE:=1}"
 : "${ROUND_NUM:=2}"
 
 export CUDA_VISIBLE_DEVICES="$CUDA_DEVICE"

@@ -35,7 +35,7 @@ export HF_DATASETS_CACHE=./.cache
 : "${TB_ROUTER_PATH:=./router_gmm_traceback_ckpt}"
 : "${OUTPUT_DIR:=./inference_results/round2_soft_tb_only/step_8}"
 : "${TASKS:=python,cpp,swift,rust,csharp,java,php,typescript,shell}"
-: "${CUDA_DEVICE:=8}"
+: "${CUDA_DEVICE:=4}"
 : "${ROUND_NUM:=2}"
 : "${ROUTING_TEMP:=1.0}"
 
