@@ -569,17 +569,27 @@ def main():
 
     # PeftModel.from_pretrained wraps the base model so that add_weighted_adapter,
     # set_adapter, delete_adapter, and disable_adapters are all available.
+    # For local directories, older PEFT versions do not resolve the subfolder in
+    # _get_peft_type, so we join base_path + subfolder into a single path.
+    _is_local = os.path.isdir(args.base_path)
+
+    def _adapter_path(sub):
+        return os.path.join(args.base_path, sub) if _is_local else args.base_path
+
+    def _subfolder_kwarg(sub):
+        return {} if _is_local else {"subfolder": sub}
+
     model = PeftModel.from_pretrained(
         base_model,
-        args.base_path,
+        _adapter_path(inference_model_path[0]),
         adapter_name="0",
-        subfolder=inference_model_path[0],
+        **_subfolder_kwarg(inference_model_path[0]),
     )
     for lora_id, lora_path in enumerate(inference_model_path[1: i + 1], start=1):
         model.load_adapter(
-            args.base_path,
+            _adapter_path(lora_path),
             adapter_name=str(lora_id),
-            subfolder=lora_path,
+            **_subfolder_kwarg(lora_path),
         )
     print(f"[INFO] Loaded adapters: {list(model.peft_config.keys())}")
 
