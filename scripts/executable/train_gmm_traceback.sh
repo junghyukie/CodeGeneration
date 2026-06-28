@@ -38,8 +38,8 @@ export HF_DATASETS_CACHE=./.cache
 : "${RESULTS_REPO_TYPE:=model}"
 : "${OUTPUT_DIR:=./router/router_gmm_traceback_ckpt_eval}"
 : "${TASKS:=python,cpp,swift,rust,csharp,java,php,typescript,shell}"
-: "${MAX_TRACEBACKS:=0}"
-: "${TRAIN_TRACEBACKS:=500}"
+: "${MAX_TRACEBACKS:=500}"
+: "${TRAIN_TRACEBACKS:=400}"
 : "${CUDA_DEVICES:=2}"
 
 export CUDA_VISIBLE_DEVICES="$CUDA_DEVICES"

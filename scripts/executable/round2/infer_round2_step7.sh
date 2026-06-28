@@ -30,7 +30,7 @@ export HF_DATASETS_CACHE=./.cache
 : "${TB_ROUTER_PATH:=router/router_gmm_traceback_ckpt}"
 : "${OUTPUT_DIR:=./inference_results/round2_disagree_explore_routing_topp_1.0/step_7}"
 : "${TASKS:=python,cpp,swift,rust,csharp,java,php,typescript}"
-: "${CUDA_DEVICE:=1}"
+: "${CUDA_DEVICE:=5}"
 : "${ROUND_NUM:=2}"
 
 export CUDA_VISIBLE_DEVICES="$CUDA_DEVICE"

@@ -28,13 +28,8 @@ export HF_DATASETS_CACHE=./.cache
 : "${PREV_RESULTS_DIR:=ankhanhtran02/gmm_exe_vf0.02_dim256_comp4_omega1.0_soft_temp_1.0_executed}"
 : "${PREV_RESULTS_SOURCE:=hf_hub}"
 : "${TB_ROUTER_PATH:=router/router_gmm_traceback_ckpt}"
-<<<<<<< HEAD:scripts/executable/round2/infer_round2_conf_linear.sh
-: "${OUTPUT_DIR:=./inference_results/round2_conf_linear_routing_topp_1.0/step_8}"
-: "${TASKS:=python,cpp,swift,rust,csharp,java,php,typescript,shell}"
-=======
 : "${OUTPUT_DIR:=./inference_results/round2_disagree_explore_routing_topp_1.0/step_1}"
 : "${TASKS:=python,cpp}"
->>>>>>> f8acb9475d9e7d7bba777f43f35a054d6f49f03a:scripts/executable/round2/infer_round2_step1.sh
 : "${CUDA_DEVICE:=1}"
 : "${ROUND_NUM:=2}"
 
