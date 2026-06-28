@@ -15,7 +15,8 @@
 #   RESULTS_REPO_TYPE - HF repo type (dataset|model|space)  (default: dataset)
 #   OUTPUT_DIR        - where router checkpoints are saved   (default: ./router_gmm_traceback_ckpt)
 #   TASKS             - comma-separated language list        (default: all 9 languages)
-#   MAX_TRACEBACKS    - max deduped tracebacks per task      (default: 0 = unlimited)
+#   MAX_TRACEBACKS    - cap on total deduped tracebacks/task  (default: 0 = unlimited)
+#   TRAIN_TRACEBACKS  - deduped samples used for training    (default: 500; rest used for eval)
 #   CUDA_DEVICES      - GPU indices to expose                (default: 0,1,2,3)
 #
 # Usage:
@@ -35,10 +36,11 @@ export HF_DATASETS_CACHE=./.cache
 : "${RESULTS_SOURCE:=hf_hub}"
 : "${RESULTS_DIR:=ankhanhtran02/executed_calibration_results}"
 : "${RESULTS_REPO_TYPE:=model}"
-: "${OUTPUT_DIR:=./router/router_gmm_traceback_ckpt}"
+: "${OUTPUT_DIR:=./router/router_gmm_traceback_ckpt_eval}"
 : "${TASKS:=python,cpp,swift,rust,csharp,java,php,typescript,shell}"
-: "${MAX_TRACEBACKS:=600}"
-: "${CUDA_DEVICES:=5}"
+: "${MAX_TRACEBACKS:=0}"
+: "${TRAIN_TRACEBACKS:=500}"
+: "${CUDA_DEVICES:=2}"
 
 export CUDA_VISIBLE_DEVICES="$CUDA_DEVICES"
 
@@ -61,4 +63,5 @@ python gmm_traceback.py \
   --truncate_side         left \
   --min_traceback_length  10 \
   --max_tracebacks        "$MAX_TRACEBACKS" \
+  --train_tracebacks      "$TRAIN_TRACEBACKS" \
   --seed                  42
