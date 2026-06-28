@@ -325,8 +325,9 @@ def run(cfg: TracebackRouterConfig) -> None:
             print(f"[warn] No training tracebacks for {task} — skipping")
             continue
 
-        # Encode full deduped set (cached), then slice into train / eval tensors
-        z_all = _load_or_encode(task, deduped, extractor, cfg)
+        # Encode full deduped set (cached), then slice into train / eval tensors.
+        # Truncate to len(deduped) in case the cache was built with a larger uncapped set.
+        z_all = _load_or_encode(task, deduped, extractor, cfg)[:len(deduped)]
         features_cache[task] = z_all
         split_cache[task] = n_train
         z_train = z_all[:n_train]
