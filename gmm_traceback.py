@@ -82,6 +82,7 @@ class TracebackRouterConfig:
     truncate_side: str = "left"         # keep END of traceback (error line); "right" keeps start
     min_traceback_length: int = 10      # discard empty / near-empty stderr entries
     max_tracebacks: int = 0             # cap on deduped tracebacks per task (0 = unlimited)
+    train_tracebacks: int = 500         # deduped samples for training; remainder used for eval (0 = all for training)
 
 
 # ---------------------------------------------------------------------------
@@ -274,6 +275,7 @@ def run(cfg: TracebackRouterConfig) -> None:
     print(f"[setup] results_source={cfg.results_source!r}  results_dir={cfg.results_dir!r}")
     print(f"[setup] tasks={list(cfg.tasks)}")
     print(f"[setup] truncate_side={cfg.truncate_side!r}  min_traceback_length={cfg.min_traceback_length}")
+    print(f"[setup] train_tracebacks={cfg.train_tracebacks}  (0 = all for training, no held-out eval)")
 
     extractor = T5RoutingFeatureExtractor(
         model_name=cfg.model_name,
@@ -286,10 +288,10 @@ def run(cfg: TracebackRouterConfig) -> None:
 
     router = ResidualFitGMMRouter(_to_router_cfg(cfg))
 
-    # Track only tasks that actually have tracebacks (skipped tasks omitted)
     seen_tasks: List[str] = []
-    # Pre-load deduped tracebacks per task so evaluation re-uses them from cache
-    deduped_cache: Dict[str, List[str]] = {}
+    # Stores full deduped feature tensor per task; sliced into train/eval at split_cache[task]
+    features_cache: Dict[str, torch.Tensor] = {}
+    split_cache: Dict[str, int] = {}  # task -> number of training samples
 
     all_results: Dict[str, Dict] = {}
 
@@ -315,26 +317,42 @@ def run(cfg: TracebackRouterConfig) -> None:
             print(f"[warn] No usable tracebacks for {task} — skipping")
             continue
 
-        deduped_cache[task] = deduped
-        z_train = _load_or_encode(task, deduped, extractor, cfg)
+        n_train = min(cfg.train_tracebacks, len(deduped)) if cfg.train_tracebacks > 0 else len(deduped)
+        n_eval = len(deduped) - n_train
+        print(f"  train split: {n_train} | eval split: {n_eval}")
+
+        if n_train == 0:
+            print(f"[warn] No training tracebacks for {task} — skipping")
+            continue
+
+        # Encode full deduped set (cached), then slice into train / eval tensors
+        z_all = _load_or_encode(task, deduped, extractor, cfg)
+        features_cache[task] = z_all
+        split_cache[task] = n_train
+        z_train = z_all[:n_train]
 
         actual_task_id = len(seen_tasks)
         seen_tasks.append(task)
         router.fit_new_task(task_name=task, task_id=actual_task_id, z_train=z_train)
         router.save(output_dir, step=actual_task_id)
 
-        # --- Routing accuracy over all seen tasks ---
-        print(f"\n[eval] Routing accuracy ({len(seen_tasks)} seen task(s)):")
+        # --- Routing accuracy + confusion matrix over all seen tasks ---
+        K = len(seen_tasks)
+        confusion = [[0] * K for _ in range(K)]
         correct_total = n_total = 0
         per_task_acc: Dict[str, float] = {}
 
+        print(f"\n[eval] Routing accuracy ({K} seen task(s)):")
         for true_id, eval_task in enumerate(seen_tasks):
-            eval_deduped = deduped_cache.get(eval_task, [])
-            if not eval_deduped:
+            z_full = features_cache.get(eval_task)
+            sp = split_cache.get(eval_task, 0)
+            z_eval = z_full[sp:] if z_full is not None and sp < len(z_full) else None
+
+            if z_eval is None or z_eval.shape[0] == 0:
                 per_task_acc[eval_task] = float("nan")
+                print(f"  - {eval_task:<18s}: n/a (no eval samples)")
                 continue
 
-            z_eval = _load_or_encode(eval_task, eval_deduped, extractor, cfg)
             pred = router.predict(z_eval)
             y = torch.full_like(pred, fill_value=true_id)
             correct = int((pred == y).sum().item())
@@ -343,17 +361,33 @@ def run(cfg: TracebackRouterConfig) -> None:
             n_total += total
             per_task_acc[eval_task] = correct / max(total, 1)
 
+            for yt, yp in zip(y.tolist(), pred.tolist()):
+                if 0 <= yt < K and 0 <= yp < K:
+                    confusion[yt][yp] += 1
+
         overall = correct_total / max(n_total, 1)
         print(f"[eval] overall routing acc = {overall:.4f}")
         for t, acc in per_task_acc.items():
-            print(f"  - {t:<18s}: {acc:.4f}" if not (isinstance(acc, float) and acc != acc) else f"  - {t:<18s}: n/a")
+            if isinstance(acc, float) and acc != acc:
+                print(f"  - {t:<18s}: n/a")
+            else:
+                print(f"  - {t:<18s}: {acc:.4f}")
+
+        print("[eval] confusion matrix (rows=true, cols=pred):")
+        header = "true\\pred" + "".join([f"\t{i}:{t[:8]}" for i, t in enumerate(seen_tasks)])
+        print(header)
+        for i, row in enumerate(confusion):
+            print(f"{i}:{seen_tasks[i][:8]}" + "".join([f"\t{v}" for v in row]))
 
         all_results[f"step{actual_task_id}"] = {
             "seen_tasks": seen_tasks[:],
             "overall_acc": overall,
             "per_task_acc": per_task_acc,
+            "confusion": confusion,
             "raw_tracebacks": len(raw_tracebacks),
             "deduped_tracebacks": len(deduped),
+            "train_tracebacks": n_train,
+            "eval_tracebacks": n_eval,
         }
         with open(output_dir / "traceback_routing_results.json", "w", encoding="utf-8") as f:
             json.dump(all_results, f, indent=2)
@@ -397,7 +431,9 @@ def build_argparser() -> argparse.ArgumentParser:
                    help="left = keep end of traceback (error type/message); right = keep start")
     p.add_argument("--min_traceback_length", type=int, default=d.min_traceback_length)
     p.add_argument("--max_tracebacks", type=int, default=d.max_tracebacks,
-                   help="Maximum deduped tracebacks per task used for training (0 = unlimited)")
+                   help="Cap on total deduped tracebacks per task before the train/eval split (0 = unlimited)")
+    p.add_argument("--train_tracebacks", type=int, default=d.train_tracebacks,
+                   help="Number of deduped tracebacks used for training; remainder held out for eval (0 = all for training)")
     return p
 
 
@@ -430,6 +466,7 @@ def main() -> None:
         truncate_side=args.truncate_side,
         min_traceback_length=args.min_traceback_length,
         max_tracebacks=args.max_tracebacks,
+        train_tracebacks=args.train_tracebacks,
     )
     run(cfg)
 
