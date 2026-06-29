@@ -325,7 +325,7 @@ class _TracebackFeatureExtractor:
 
     Loads the T5 model and projection matrix from a saved traceback router
     checkpoint directory (produced by gmm_traceback.py).  The encode/score
-    interface mirrors T5RoutingFeatureExtractor in gmm.py.
+    interface mirrors RoutingFeatureExtractor in gmm.py.
     """
 
     def __init__(

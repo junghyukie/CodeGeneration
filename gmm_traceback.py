@@ -38,7 +38,7 @@ from torch.utils.data import DataLoader, TensorDataset
 from gmm import (
     ResidualFitGMMRouter,
     RouterConfig,
-    T5RoutingFeatureExtractor,
+    RoutingFeatureExtractor,
     ensure_dir,
     get_device,
     set_seed,
@@ -185,7 +185,7 @@ def _feature_cache_path(cfg: TracebackRouterConfig, task: str) -> Path:
 
 def encode_tracebacks(
     tracebacks: List[str],
-    extractor: T5RoutingFeatureExtractor,
+    extractor: RoutingFeatureExtractor,
     cfg: TracebackRouterConfig,
 ) -> torch.Tensor:
     """Tokenize tracebacks and extract encoder features, returning shape [N, routing_dim]."""
@@ -216,7 +216,7 @@ def encode_tracebacks(
 def _load_or_encode(
     task: str,
     tracebacks: List[str],
-    extractor: T5RoutingFeatureExtractor,
+    extractor: RoutingFeatureExtractor,
     cfg: TracebackRouterConfig,
 ) -> Optional[torch.Tensor]:
     """Return encoded features for `tracebacks`, using cache when available."""
@@ -277,7 +277,7 @@ def run(cfg: TracebackRouterConfig) -> None:
     print(f"[setup] truncate_side={cfg.truncate_side!r}  min_traceback_length={cfg.min_traceback_length}")
     print(f"[setup] train_tracebacks={cfg.train_tracebacks}  (0 = all for training, no held-out eval)")
 
-    extractor = T5RoutingFeatureExtractor(
+    extractor = RoutingFeatureExtractor(
         model_name=cfg.model_name,
         feature_layers=cfg.feature_layers,
         routing_dim=cfg.routing_dim,

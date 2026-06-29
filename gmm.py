@@ -52,7 +52,7 @@ class RouterConfig:
     save_features: bool = True
     force_recompute_features: bool = False
 
-def t5_pad_collate(batch: List[Dict[str, torch.Tensor]], pad_token_id: int = 0, label_pad_id: int = -100):
+def router_pad_collate(batch: List[Dict[str, torch.Tensor]], pad_token_id: int = 0, label_pad_id: int = -100):
     max_input_len = max(x["input_ids"].numel() for x in batch)
     input_ids = []
     attention_mask = []
@@ -187,7 +187,7 @@ def create_executable_dataset(
     eval_dataset = _load_eval_dataset(dataset_name, language, num_eval, seed)
     return train_dataset, eval_dataset, test_dataset
 
-class T5RoutingFeatureExtractor:
+class RoutingFeatureExtractor:
     """Frozen T5 encoder feature extractor for routing."""
 
     def __init__(self, model_name: str, feature_layers: int, routing_dim: int, device: torch.device, seed: int):
@@ -515,7 +515,7 @@ def build_dataloader(tokenizer, task: str, split: str, batch_size: int, k: int, 
         enc,
         batch_size=batch_size,
         shuffle=(split == "train"),
-        collate_fn=lambda batch: t5_pad_collate(batch, pad_token_id=pad_token_id, label_pad_id=-100),
+        collate_fn=lambda batch: router_pad_collate(batch, pad_token_id=pad_token_id, label_pad_id=-100),
     )
 
 
@@ -553,7 +553,7 @@ def build_executable_dataloader(
         enc,
         batch_size=batch_size,
         shuffle=(split == "train"),
-        collate_fn=lambda batch: t5_pad_collate(
+        collate_fn=lambda batch: router_pad_collate(
             batch,
             pad_token_id=pad_token_id,
             label_pad_id=-100,
@@ -576,7 +576,7 @@ def feature_cache_path(
 
 
 def get_or_extract_features(
-    extractor: T5RoutingFeatureExtractor,
+    extractor: RoutingFeatureExtractor,
     cfg: RouterConfig,
     task: str,
     split: str,
@@ -627,7 +627,7 @@ class EvalResult:
 
 def evaluate_seen_tasks(
     router: ResidualFitGMMRouter,
-    extractor: T5RoutingFeatureExtractor,
+    extractor: RoutingFeatureExtractor,
     cfg: RouterConfig,
     seen_tasks: List[str],
     split: str,
@@ -696,7 +696,7 @@ def run(cfg: RouterConfig, resume_from: Optional[str] = None) -> None:
         print(f"[setup] executable_dataset_name={cfg.executable_dataset_name}")
     print(f"[setup] tasks={list(cfg.tasks)}")
 
-    extractor = T5RoutingFeatureExtractor(
+    extractor = RoutingFeatureExtractor(
         model_name=cfg.model_name,
         feature_layers=cfg.feature_layers,
         routing_dim=cfg.routing_dim,

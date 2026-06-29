@@ -1,137 +1,207 @@
-# T5 Continual Learning with LoRA 
+# GMM-Router
 
-A comprehensive implementation of continual learning methods for code-related tasks using T5 models with LoRA (Low-Rank Adaptation) and various catastrophic forgetting mitigation techniques.
-##  Overview
+Parameter-efficient continual code generation via per-task LoRA adapters and a Gaussian Mixture Model instruction router. Each new task trains an isolated LoRA adapter and fits a GMM on routing embeddings extracted from a frozen backbone; no earlier adapters or backbone weights are modified. At inference, the router scores each task against the query embedding and either selects the top expert (hard routing) or merges adapters weighted by the routing distribution (soft routing).
 
-This repository implements several continual learning strategies for code generation, translation, and refinement tasks:
+Two benchmark tracks are supported:
 
-- **Full Fine-tuning**: Standard fine-tuning on sequential tasks
-- **Full Fine-tuning with EWC**: Elastic Weight Consolidation to prevent catastrophic forgetting
-- **LoRA per Task**: Parameter-efficient fine-tuning with separate LoRA adapters
-- **O-LoRA (Orthogonal LoRA)**: LoRA with orthogonality constraints to reduce task interference
-- **LoRA with EWC**: LoRA with Elastic Weight Consolidation
+- **CodeTask** — non-executable tasks: CONCODE, CodeTrans, CodeSearchNet, BFP, KodCode, RunBugRun, TheVault\_Csharp, CoST
+- **Executable** — nine programming languages: Python, C++, Swift, Rust, C#, Java, PHP, TypeScript, Shell
 
-## Supported Tasks
-The framework supports four code-related tasks from CodeXGLUE benchmark:
-1. **CodeTrans**: Java to C# code translation
-2. **CodeSearchNet**: Ruby code summarization
-3. **BFP**: Bug fixing/code refinement
-4. **CONCODE**: Natural language to Java code generation
+For the CodeTask benchmark the pipeline uses Steps 1a, 1b, and 4 only. For the Executable benchmark all five steps run, with Steps 2–3 adding calibration-based adapter refinement and a traceback GMM trained on runtime error messages.
 
-## 🛠️ Installation
+---
 
-### Install Dependencies
+## Installation
+
+```bash
 pip install -r requirements.txt
-
-##  Quick Start
-
-### 1. Full Fine-tuning with EWC
-```bash
-python t5_fullfinetune.py \
-  --task_list CONCODE CodeTrans CodeSearchNet BFP \
-  --log_filepath logs/fullft_ewc.log \
-```
-### 3. LoRA per Task
-
-```bash
-python t5_trainer1.py \
-  --task_list CONCODE CodeTrans CodeSearchNet BFP\
-  --log_filepath logs/lora_pertask.log \
 ```
 
-### 4. O-LoRA (Orthogonal LoRA)
+A GPU with at least 24 GB VRAM is required for single-GPU runs; multi-GPU training uses DeepSpeed ZeRO-2 and is configured via `CUDA_VISIBLE_DEVICES`.
 
-```bash
-python t5_olora.py \
-  --task_list CONCODE CodeTrans CodeSearchNet BFP \
-  --log_filepath logs/olora.log \
+---
+
+## Pipeline
+
+The full pipeline is illustrated in the Methodology chapter (Chapter 4). Steps 1a and 1b run in parallel. After Step 1, two branches execute concurrently: the right branch runs Round-1 inference (Step 4) directly; the left branch generates calibration predictions (Step 2), then refines the adapter (Step 3a) and fits the traceback GMM (Step 3b) in parallel. Round-2 inference (Step 5) runs after both branches complete and re-predicts only the samples where all Round-1 candidates failed.
+
+```
+Step 1a  Train LoRA adapter  ─┬─────────────────────────────► Step 4  Round-1 inference
+Step 1b  Fit instruction GMM ─┘         │
+                                        ▼
+                               Step 2  Calibration inference   (executable only)
+                                 ├─► Step 3a  Refine adapter   (executable only)
+                                 └─► Step 3b  Fit traceback GMM (executable only)
+                                        │
+                                        ▼
+                               Step 5  Round-2 inference        (executable only)
 ```
 
-### 5. Continual Learning with EWC
+---
 
-```bash
-python t5_continual_ewc.py \
-  --task_list CONCODE CodeTrans CodeSearchNet BFP \
-  --log_filepath logs/ewc_training.log \
-```
+## CodeTask benchmark
 
-## Calibration Set Inference (Executable Benchmark)
+### Step 1a — Train LoRA adapters
 
-After training per-task anamoe adapters, evaluate them on the `calibration_MBPP` split of
-[`ankhanhtran02/CL4Code-executable-datasets`](https://huggingface.co/datasets/ankhanhtran02/CL4Code-executable-datasets).
-The script runs multi-GPU inference (via DeepSpeed) and writes one JSON file per language containing
-the source instruction, model predictions (up to `num_return_sequences` samples for pass@k), the
-reference solution, and the unit-test string needed for execution-based evaluation.
-
-### Quick start
+Trains one LoRA adapter per task sequentially on eight CodeTask datasets. Requires DeepSpeed and at least 6 GPUs.
 
 ```bash
-# Train adapters first (produces ./output_models/lora_per_task_executable_start_4/<lang>/0/)
-bash scripts/train_anamoe_executable.sh
-
-# Run calibration inference (default: 3 GPUs, ZERO_STAGE=0)
-bash scripts/infer_calibration_split.sh
+bash scripts/codetask/train_anamoe_codetask.sh
 ```
 
-### Configuration
+Adapters are saved to `./output_models/anamoe/<task>/` and uploaded to HuggingFace Hub at `dongg18/anamoe`.
 
-| Variable          | Default                                                     | Description                          |
-|-------------------|-------------------------------------------------------------|--------------------------------------|
-| `MODEL`           | `Qwen/Qwen2.5-Coder-1.5B`                                  | Base model path or HF repo ID        |
-| `ADAPTER_BASE_DIR`| `./output_models/lora_per_task_executable_start_4`          | Root dir containing per-language adapters (`<lang>/0/`) or an HF Hub repo ID |
-| `OUTPUT_DIR`      | `./calibration_results`                                     | Directory for output JSON files      |
-| `CUDA_DEVICES`    | `0,1,2`                                                     | GPU indices exposed to the script    |
-| `NUM_GPUS`        | (auto-detected from `CUDA_DEVICES`)                         | Number of GPUs to use                |
-| `ZERO_STAGE`      | `0`                                                         | DeepSpeed ZeRO stage (0 = fastest for inference) |
+### Step 1b — Fit instruction GMM router
 
-### Output format
-
-Each `calibration_<language>.json` matches the `_save_generation_predictions` format:
-
-```json
-{
-  "metrics": {},
-  "predictions": [
-    {
-      "source": "Write a function that ...",
-      "ground-truth": "def solve(...):\n    ...",
-      "prediction": ["def solve(...):\n    ...", "..."],
-      "test": "assert solve(...) == ..."
-    }
-  ]
-}
-```
-
-`prediction` is a list when `--num_return_sequences > 1` (for pass@k).
-
-### Single-GPU example
+Extracts routing embeddings from the frozen backbone and fits a per-task diagonal GMM. Steps 1a and 1b are independent and can be run in parallel once adapters exist.
 
 ```bash
-CUDA_DEVICES=0 NUM_GPUS=1 \
-  ADAPTER_BASE_DIR=./output_models/lora_per_task_executable_start_4 \
-  OUTPUT_DIR=./calibration_results \
-  bash scripts/infer_calibration_split.sh
+bash scripts/codetask/router_codetask.sh
 ```
 
-### Loading adapters from HuggingFace Hub
+The router checkpoint is saved to `router/router_gmm_codetask_vf0.02_dim_256_comp_4_layer_4/`.
+
+### Step 4 — Round-1 inference
+
+Runs inference on all eight CodeTask tasks using the instruction router. Defaults to hard routing.
 
 ```bash
-ADAPTER_BASE_DIR=ankhanhtran02/lora-per-task-executable-start-4 \
-  bash scripts/infer_calibration_split.sh
+# All eight tasks in one run
+bash scripts/codetask/infer_gmm_codetask.sh [soft|hard]
+
+# Or task-by-task (one adapter added per script, in task order)
+bash scripts/codetask/infer_gmm_CONCODE.sh
+bash scripts/codetask/infer_gmm_CodeTrans.sh
+bash scripts/codetask/infer_gmm_CodeSearchNet.sh
+bash scripts/codetask/infer_gmm_BFP.sh
+bash scripts/codetask/infer_gmm_KodCode.sh
+bash scripts/codetask/infer_gmm_RunBugRun.sh
+bash scripts/codetask/infer_gmm_TheVault_Csharp.sh
+bash scripts/codetask/infer_gmm_CoST.sh
 ```
 
-The script will pass the repo ID to the trainer; the subfolder `<language>/0` is resolved
-automatically by `model.load_adapter`.
+Results are written to `./inference_results/gmm_codetask_*/`.
 
-## 📄 License
+---
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+## Executable benchmark
 
-## 🙏 Acknowledgments
+### Step 1a — Train LoRA adapters
 
-- Salesforce for the CodeT5 model
-- Microsoft for the CodeXGLUE benchmark
-- Hugging Face for the transformers and PEFT libraries
-- The open-source community for continual learning research
+Trains one LoRA adapter per language on the executable benchmark. Requires 3 GPUs.
 
-**⭐ Star this repo if you find it helpful!**
+```bash
+bash scripts/executable/train_anamoe_executable.sh
+```
+
+Adapters are saved to `./output_models/lora_per_task_executable_start_4/<language>/` and uploaded to HuggingFace Hub at `ankhanhtran02/lora-per-task-executable-start-4`.
+
+### Step 1b — Fit instruction GMM router
+
+```bash
+# Full training run (recommended)
+bash scripts/executable/router_executable.sh
+
+# Resume from a checkpoint (e.g. after step 7)
+bash scripts/executable/router_executable_step8.sh
+```
+
+The router checkpoint is saved to `router/ckpt_executable_dim256_comp4_vf0.001_mean/`.
+
+### Step 4 — Round-1 inference
+
+```bash
+# All nine languages
+bash scripts/executable/infer_gmm_executable.sh [soft|hard]
+
+# Top-p 0.9 routing variant
+bash scripts/executable/infer_gmm_executable_topp0.9.sh [soft|hard]
+
+# Incremental (one language added per step, useful for ablation)
+bash scripts/executable/round1/step0.sh   # python only
+bash scripts/executable/round1/step1.sh   # python, cpp
+# ... up to step8 (all nine languages)
+bash scripts/executable/round1/step8.sh
+```
+
+Results are written to `./inference_results/gmm_exe_*/`.
+
+### Step 2 — Calibration inference (executable only)
+
+Runs each language adapter on the `calibration_MBPP` split and writes one JSON file per language containing source, predictions, ground-truth, and unit tests for execution-based evaluation.
+
+```bash
+bash scripts/executable/infer_calibration_split.sh
+```
+
+| Variable | Default | Description |
+|---|---|---|
+| `MODEL` | `Qwen/Qwen2.5-Coder-1.5B` | Base model |
+| `ADAPTER_BASE_DIR` | `ankhanhtran02/lora-per-task-executable-start-4` | Adapter repo or local dir |
+| `OUTPUT_DIR` | `./calibration_results` | Output directory |
+| `CUDA_DEVICES` | `0,1,2,3` | GPU indices |
+| `ZERO_STAGE` | `0` | DeepSpeed ZeRO stage |
+
+After this step, run the execution harness (outside this repo) to populate the pass/fail and traceback fields in each JSON file before proceeding to Steps 3a and 3b.
+
+### Step 3a — Refine LoRA adapter (executable only)
+
+Fine-tunes each adapter on repair pairs extracted from failed calibration predictions. Each pair is `(instruction + buggy code + traceback) → ground-truth`.
+
+```bash
+bash scripts/executable/refine_adapter.sh
+```
+
+| Variable | Default | Description |
+|---|---|---|
+| `LANG_ID` | `swift,rust,csharp,java,php,typescript,shell` | Comma-separated languages |
+| `ADAPTER_PATH` | `ankhanhtran02/lora-per-task-executable-start-4` | Source adapter |
+| `RESULTS_DIR` | `ankhanhtran02/executed_calibration_results` | Executed calibration JSON |
+| `OUTPUT_BASE_DIR` | `./refined_adapters` | Output directory |
+
+### Step 3b — Fit traceback GMM router (executable only)
+
+Encodes runtime error messages from failed calibration predictions and fits a per-language GMM. Runs in parallel with Step 3a.
+
+```bash
+bash scripts/executable/train_gmm_traceback.sh
+```
+
+The checkpoint is saved to `router/router_gmm_traceback_ckpt_eval/`.
+
+### Step 5 — Round-2 inference (executable only)
+
+For samples where all Round-1 predictions failed, combines instruction and traceback router scores via a JSD-gated rule and generates a new prediction.
+
+```bash
+# All nine languages (full round-2 run)
+bash scripts/executable/round2/infer_round2_disagree_explore.sh
+
+# Refined-adapter variant
+bash scripts/executable/round2/infer_round2_disagree_explore_refined.sh
+
+# Incremental (one language per step)
+bash scripts/executable/round2/infer_round2_step0.sh  # python
+# ... up to step7
+bash scripts/executable/round2/infer_round2_step7.sh
+```
+
+Results are written to `./inference_results/round2_*/`.
+
+---
+
+## Environment variables
+
+Most scripts expose the following variables with sensible defaults:
+
+| Variable | Description |
+|---|---|
+| `CUDA_VISIBLE_DEVICES` | GPU indices visible to the process |
+| `HF_HOME` | HuggingFace cache root (default: `./.cache`) |
+| `HF_DATASETS_CACHE` | HuggingFace datasets cache (default: `./.cache`) |
+
+---
+
+## License
+
+This project is licensed under the MIT License — see [LICENSE](LICENSE) for details.
