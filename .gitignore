@@ -9,3 +9,4 @@ calibration_results*
 refined_adapters
 Makefile
 thesis
+*__pycache__/

@@ -511,6 +511,13 @@ def parse_args():
         help='Pad re-generated prediction lists to this length with empty strings '
              '(default: 5). Set to 0 to disable padding.',
     )
+    parser.add_argument(
+        '--demo_dataset_path', type=str, default=None,
+        help='Path to a local JSON file of {instruction, solution, test, language} rows '
+             'for single/few-sample round-1 demo inference. When set, replaces the full '
+             'HF test split for round-1 (non round-2) inference; tasks with no matching '
+             'rows are skipped.',
+    )
 
     return parser.parse_args()
 
@@ -532,6 +539,24 @@ def _load_router_file(router_weight_path: str, filename: str) -> str:
     if os.path.isdir(router_weight_path):
         return os.path.join(router_weight_path, filename)
     return hf_hub_download(repo_id=router_weight_path, filename=filename, repo_type="model")
+
+
+def _load_demo_dataset(path: str, language: str) -> List[Dict[str, str]]:
+    """Load a small local JSON file of {instruction, solution, test, language} rows
+    for single/few-sample round-1 demo inference, bypassing the full HF test split.
+
+    Returns a list of {"prompt": ..., "answer": ...} dicts (DataCollator's expected
+    instance format), filtered to the given language. Empty if none match.
+    """
+    with open(path, "r", encoding="utf-8") as f:
+        rows = json.load(f)
+    if isinstance(rows, dict):
+        rows = [rows]
+    return [
+        {"prompt": row["instruction"], "answer": row.get("solution") or ""}
+        for row in rows
+        if row.get("language") == language
+    ]
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -1132,7 +1157,13 @@ def main():
 
         else:
             # ── Round-1 mode: normal inference ────────────────────────────────
-            if args.benchmark == "non-executable":
+            if args.demo_dataset_path:
+                infer_dataset = _load_demo_dataset(args.demo_dataset_path, task)
+                if not infer_dataset:
+                    print(f"[demo] Skipping {task}: no rows for this language in "
+                          f"{args.demo_dataset_path}.")
+                    continue
+            elif args.benchmark == "non-executable":
                 _, _, infer_dataset = create_codetask_dataset(task, args.seed, -1, -1, -1)
             else:
                 _, _, infer_dataset = create_executable_dataset(task, args.seed, -1, -1, -1)

@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import shutil
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -47,6 +48,19 @@ def _load_instruction_tests(dataset_repo: str, language: str, split: str = "test
 	return {row["instruction"]: row["test"] for row in dataset}
 
 
+def _load_instruction_tests_from_file(path: Path, language: str) -> dict[str, str]:
+	"""Same mapping as _load_instruction_tests, but from a local demo JSON file
+	of {instruction, test, language} rows instead of an HF Hub dataset repo."""
+	rows = json.loads(Path(path).read_text(encoding="utf-8"))
+	if isinstance(rows, dict):
+		rows = [rows]
+	return {
+		row["instruction"]: row["test"]
+		for row in rows
+		if row.get("language") == language and row.get("test") is not None
+	}
+
+
 def _download_prediction(repo_id: str, repo_path: str, output_dir: Path) -> Path:
 	# 1. Download to the default HF cache
 	local_cache_path = hf_hub_download(repo_id=repo_id, filename=repo_path)
@@ -73,7 +87,7 @@ def _read_prediction_payload(path: Path) -> tuple[dict, bool]:
 		return payload, False
 	except json.JSONDecodeError:
 		rows = [json.loads(line) for line in text.splitlines() if line.strip()]
-		return {"metrics": {}, "predictions": rows}, True
+		return {"eval": {}, "predictions": rows}, True
 
 
 def _write_prediction_payload(path: Path, payload: dict, as_jsonl: bool) -> None:
@@ -127,7 +141,7 @@ def execute_predictions(file_path: Path, max_workers: int | None = None) -> Path
 	print(f"Inferred language: {language}")
 
 	predictions = payload.get("predictions", [])
-	metrics = payload.get("metrics", {})
+	metrics = payload.get("eval", {})
 
 	all_predictions = 0
 	total_passed = 0
@@ -189,7 +203,7 @@ def execute_predictions(file_path: Path, max_workers: int | None = None) -> Path
 	metrics["total_passed_predictions"] = total_passed
 	metrics["num_all_passed_samples"] = all_passed_samples
 	metrics["num_all_failed_samples"] = all_failed_samples
-	payload["metrics"] = metrics
+	payload["eval"] = metrics
 	payload["predictions"] = predictions
 
 	_write_prediction_payload(file_path, payload, as_jsonl=as_jsonl)
@@ -209,14 +223,14 @@ def calculate_pass_at_k(file_path: Path, num_samples: int = 5, ks: list[int] | N
 	if ks is None:
 		ks = [1, 5]
 	payload, as_jsonl = _read_prediction_payload(file_path)
-	metrics = payload.get("metrics", {})
+	metrics = payload.get("eval", {})
 	predictions = payload.get("predictions", [])
 
 	num_correct = [row.get("num_passed", 0) for row in predictions]
 	for k in ks:
 		metrics[f"pass_at_{k}"] = float(_estimate_pass_at_k(num_samples, num_correct, k).mean()) if num_correct else 0.0
 
-	payload["metrics"] = metrics
+	payload["eval"] = metrics
 
 	_write_prediction_payload(file_path, payload, as_jsonl=as_jsonl)
 	return metrics
@@ -227,6 +241,7 @@ def add_tests_to_local_predictions(
 	dataset_repo: str,
 	row_preprocessor=None,
 	split: str = "test_McEval",
+	local_test_source: Path | None = None,
 ) -> tuple[int, int]:
 	payload, _ = _read_prediction_payload(file_path)
 
@@ -238,7 +253,11 @@ def add_tests_to_local_predictions(
 		predictions = [row_preprocessor(row) for row in predictions]
 		payload["predictions"] = predictions
 
-	instruction_tests = {k.strip().strip("\n"): v for k, v in _load_instruction_tests(dataset_repo, file_language, split).items()}
+	if local_test_source is not None:
+		raw_tests = _load_instruction_tests_from_file(local_test_source, file_language)
+	else:
+		raw_tests = _load_instruction_tests(dataset_repo, file_language, split)
+	instruction_tests = {k.strip().strip("\n"): v for k, v in raw_tests.items()}
 
 	missing = 0
 	for row in predictions:
@@ -262,6 +281,7 @@ def run_local_pipeline(
 	row_preprocessor=None,
 	ks: list[int] | None = None,
 	split: str = "test_McEval",
+	local_test_source: Path | None = None,
 ) -> None:
 	for file_path in file_paths:
 		print()
@@ -270,6 +290,7 @@ def run_local_pipeline(
 			dataset_repo=dataset_repo,
 			row_preprocessor=row_preprocessor,
 			split=split,
+			local_test_source=local_test_source,
 		)
 		print(f"{file_path}: {missing}/{total} tests missing")
 		execute_predictions(file_path, max_workers=max_workers)
@@ -312,11 +333,11 @@ def parse_args() -> argparse.Namespace:
 		description="Attach tests, execute predictions, and compute pass@k for HF prediction files.",
 		formatter_class=argparse.ArgumentDefaultsHelpFormatter,
 	)
-	parser.add_argument("--repo-id", required=True, help="Hugging Face repo id containing prediction files.")
+	parser.add_argument("--repo-id", default=None, help="Hugging Face repo id containing prediction files.")
 	parser.add_argument(
 		"--prediction-paths",
 		nargs="+",
-		required=True,
+		default=None,
 		help="File paths inside the repo to prediction JSON/JSONL files.",
 	)
 	parser.add_argument(
@@ -334,11 +355,43 @@ def parse_args() -> argparse.Namespace:
 	parser.add_argument("--ks", nargs="+", type=int, default=[1, 5], help="Values of k for pass@k computation.")
 	parser.add_argument("--max-workers", type=int, default=None, help="Max parallel workers for candidate evaluation.")
 	parser.add_argument("--split", default="test_McEval", help="Dataset split to load tests from.")
+	parser.add_argument(
+		"--local-file",
+		nargs="+",
+		type=Path,
+		default=None,
+		help="Local prediction JSON file(s) to evaluate in place (skips HF Hub download).",
+	)
+	parser.add_argument(
+		"--local-test-source",
+		type=Path,
+		default=None,
+		help="Local JSON file of {instruction, test, language} rows, used instead of "
+		     "--dataset-repo when evaluating --local-file inputs.",
+	)
 	return parser.parse_args()
 
 
 def main() -> None:
 	args = parse_args()
+
+	if args.local_file:
+		run_local_pipeline(
+			file_paths=args.local_file,
+			dataset_repo=args.dataset_repo,
+			num_samples=args.num_samples,
+			max_workers=args.max_workers,
+			ks=args.ks,
+			split=args.split,
+			local_test_source=args.local_test_source,
+		)
+		return
+
+	if not args.repo_id or not args.prediction_paths:
+		raise SystemExit(
+			"Either --local-file, or both --repo-id and --prediction-paths, must be provided."
+		)
+
 	run_full_pipeline(
 		repo_id=args.repo_id,
 		prediction_paths=args.prediction_paths,
@@ -351,8 +404,11 @@ def main() -> None:
 	)
 
 
-if __name__ == "__main__":
-	# main()
+def _run_hardcoded_batch_pipeline() -> None:
+	"""Original ad-hoc batch entry point, preserved as-is: evaluates the fixed
+	list of round2_disagree_explore_refined result files. Runs when the script
+	is executed with no CLI arguments; pass any flag (e.g. --local-file) to use
+	the argparse-driven main() instead."""
 	langs = (
     "python",
     "cpp",
@@ -392,3 +448,10 @@ if __name__ == "__main__":
 			)
 		except Exception as e:
 			print(f"Error during execution: {e}")
+
+
+if __name__ == "__main__":
+	if len(sys.argv) > 1:
+		main()
+	else:
+		_run_hardcoded_batch_pipeline()
