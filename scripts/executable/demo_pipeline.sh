@@ -8,10 +8,7 @@ export HF_DATASETS_CACHE=./.cache
 : "${ROUTER_PATH:=ankhanhtran02/router_ckpt_executable_dim256_comp4_vf0.001_mean}"
 : "${TB_ROUTER_PATH:=ankhanhtran02/router_gmm_traceback_ckpt}"
 : "${DEVICE:=cpu}"
-# Space-separated list of languages to evaluate, e.g. LANGUAGES="rust java".
-# infer_gmm.py already filters --demo_dataset_path per-language internally and
-# writes one results file per language that has matching rows (skipping the
-# rest), so DEMO_DATASET_PATH may freely mix rows from several languages.
+# python cpp swift rust csharp java php typescript shell
 : "${LANGUAGES:=python cpp swift rust csharp java php typescript shell}"
 : "${DEMO_DATASET_PATH:=demo_data/executable/mixed.json}"
 : "${OUTPUT_ROOT:=./inference_results/demo_pipeline}"

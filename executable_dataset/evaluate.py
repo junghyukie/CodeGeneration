@@ -237,9 +237,19 @@ def _find_java_main_class(source: str) -> str | None:
     return None
 
 
+def _unique_class_name(taken: set[str], base: str) -> str:
+    if base not in taken:
+        return base
+    suffix = 2
+    while f"{base}{suffix}" in taken:
+        suffix += 1
+    return f"{base}{suffix}"
+
+
 def _java_source(solution: str, test: str) -> PreparedSource:
     solution_has_class = bool(re.search(r"\bclass\s+\w+\b", solution))
     public_class_name = _find_public_class(solution)
+    explicit_main_class: str | None = None
 
     if not solution_has_class:
         if not re.search(r"\bclass\s+\w+\b", test):
@@ -258,11 +268,20 @@ def _java_source(solution: str, test: str) -> PreparedSource:
             body += test_members.strip()
             source = "public class Main {\n" + _indent(body, 4) + "\n}\n"
     else:
+        existing_class_names = set(re.findall(r"\bclass\s+(\w+)\b", solution))
         if re.search(r"\bclass\s+\w+\b", test):
             source = _ensure_trailing_newline(solution) + "\n" + _ensure_trailing_newline(test)
+            # The solution may already ship its own demo `main`; the test's main
+            # (if any) is the one that actually runs the assertions, so prefer it.
+            explicit_main_class = _find_java_main_class(test)
         else:
             test = _trim_trailing_braces(test)
-            wrapper_class = "class Main" if public_class_name else "public class Main"
+            # Never reuse a class name the solution already declares (e.g. a model
+            # that emits its own `class Main { public static void main(...) }`
+            # alongside `class Solution`) -- doing so causes a "duplicate class"
+            # compile error instead of a clean wrap.
+            wrapper_name = _unique_class_name(existing_class_names, "Main")
+            wrapper_class = f"class {wrapper_name}" if public_class_name else f"public class {wrapper_name}"
             if re.search(r"\bstatic\s+void\s+main\s*\(", test):
                 main_members = test
             else:
@@ -275,9 +294,10 @@ def _java_source(solution: str, test: str) -> PreparedSource:
                 + _indent(main_members.strip(), 4)
                 + "\n}\n"
             )
+            explicit_main_class = wrapper_name
 
     file_stem = _find_public_class(source) or "Main"
-    main_class = _find_java_main_class(source) or "Main"
+    main_class = explicit_main_class or _find_java_main_class(source) or "Main"
     return PreparedSource(
         language="java",
         source=source,

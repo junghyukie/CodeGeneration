@@ -17,7 +17,7 @@ ROUTING_MODE=${1:-hard}
 
 : "${MODEL:=Qwen/Qwen2.5-Coder-1.5B}"
 : "${BASE_PATH:=dongg18/anamoe}"
-: "${ROUTER_PATH:=router/router_gmm_codetask_vf0.02_dim_256_comp_4_layer_4}"
+: "${ROUTER_PATH:=ankhanhtran02/router_gmm_codetask_vf0.02_dim_256_comp_4_layer_4}"
 : "${DEVICE:=cpu}"
 : "${DEMO_DATASET_PATH:=demo_data/codetask/mixed.json}"
 : "${OUTPUT_PATH:=./inference_results/demo_pipeline/codetask}"
