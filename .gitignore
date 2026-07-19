@@ -10,3 +10,6 @@ refined_adapters
 Makefile
 thesis
 *__pycache__/
+demo_data/
+.cache/
+.claude/
