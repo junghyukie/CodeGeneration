@@ -15,6 +15,7 @@ OUTPUT_ROOT=${OUTPUT_ROOT:-./router/gmm_permutations}
 TRAIN_K=${TRAIN_K:-5000}
 EVAL_K=${EVAL_K:-1000}
 BATCH_SIZE=${BATCH_SIZE:-16}
+PYTHON_BIN=${PYTHON_BIN:-python}
 
 # Task IDs from the experiment design:
 # A=CONCODE, B=CodeTrans, C=CodeSearchNet, D=BFP,
@@ -48,7 +49,7 @@ echo "Task order: ${TASKS}"
 echo "Output: ${OUTPUT_DIR}"
 
 # These defaults intentionally match scripts/codetask/router_codetask.sh.
-python gmm.py \
+"$PYTHON_BIN" gmm.py \
   --model_name "$MODEL" \
   --output_dir "$OUTPUT_DIR" \
   --dataset_source codetask \

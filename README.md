@@ -34,10 +34,17 @@ Chạy một scenario:
 bash scripts/codetask/train_gmm_permutation.sh permutation_1
 ```
 
-Chạy cả baseline và bốn permutation:
+Chạy cả baseline và bốn permutation. Script này tự cài dependencies từ
+`requirements.txt` trước khi chạy:
 
 ```bash
 bash scripts/codetask/train_gmm_all_permutations.sh
+```
+
+Nếu Python không phải lệnh `python`, chỉ định nó qua `PYTHON_BIN`:
+
+```bash
+PYTHON_BIN=python3 bash scripts/codetask/train_gmm_all_permutations.sh
 ```
 
 Output tách riêng tại `router/gmm_permutations/<scenario>/`, nên các
