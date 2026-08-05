@@ -65,6 +65,7 @@ AllDatasetNameExecutable = [
     'java', 'php', 'typescript', 'shell',
 ]
 from evaluator.compute_metrics import compute_metrics, DATASET_TO_OUTPUT_LANG
+from router_baselines import BaselineRouter
 
 
 # ── GMM router classes ────────────────────────────────────────────────────────
@@ -419,6 +420,13 @@ def parse_args():
         '--router_weight_path', type=str, default='',
         help='HF Hub repo-id OR local directory containing router_step{i}.pt and projection_P.pt',
     )
+    parser.add_argument(
+        '--router_method',
+        choices=['gmm', 'single_gaussian', 'centroid', 'knn', 'oracle'],
+        default='gmm',
+        help='Routing method. single_gaussian loads a GMM checkpoint trained with M=1; '
+             'oracle selects the adapter matching the evaluation task.',
+    )
     parser.add_argument('--data_output_path', type=str, default='/tmp/data_files/')
     parser.add_argument(
         '--benchmark', type=str, choices=['executable', 'non-executable'],
@@ -633,13 +641,38 @@ def main():
     model.to(device)
     model.eval()
 
-    # ── Load GMM router checkpoint ─────────────────────────────────────────────
-    router_pt = _load_router_file(args.router_weight_path, f"router_step{i}.pt")
-    proj_pt   = _load_router_file(args.router_weight_path, "projection_P.pt")
+    # ── Load the selected routing method ───────────────────────────────────────
+    if args.router_method == 'oracle':
+        router = ResidualFitGMMRouter(RouterConfig(
+            model_name=args.model_name_or_path,
+            tasks=tuple(inference_tasks),
+        ))
+        router.tasks = [
+            TaskRouter(task_name=task, task_id=task_id, gmm=None)
+            for task_id, task in enumerate(inference_tasks)
+        ]
+        projection = None
+    else:
+        router_pt = _load_router_file(args.router_weight_path, f"router_step{i}.pt")
+        proj_pt = _load_router_file(args.router_weight_path, "projection_P.pt")
+        if args.router_method in {'centroid', 'knn'}:
+            router = BaselineRouter.load(router_pt)
+            if router.method != args.router_method:
+                raise ValueError(
+                    f"Requested {args.router_method} but checkpoint contains {router.method}"
+                )
+        else:
+            router = ResidualFitGMMRouter.load(router_pt)
+            if args.router_method == 'single_gaussian':
+                components = {task.gmm.n_components for task in router.tasks}
+                if components != {1}:
+                    raise ValueError(
+                        "single_gaussian requires a checkpoint trained with --gmm_components 1; "
+                        f"found component counts {sorted(components)}"
+                    )
+        projection = torch.load(proj_pt, map_location="cpu").float().to(device)
 
-    router = ResidualFitGMMRouter.load(router_pt)
-    projection = torch.load(proj_pt, map_location="cpu").float().to(device)  # [p, 2*hidden]
-    print(f"[INFO] GMM router: {len(router.tasks)} tasks "
+    print(f"[INFO] Router method: {args.router_method}; {len(router.tasks)} tasks "
           f"{[tr.task_name for tr in router.tasks]}")
     print(f"[INFO] Routing model: {router.cfg.model_name}  "
           f"feature_layers={router.cfg.feature_layers}  "
@@ -654,11 +687,18 @@ def main():
         print(f"[WARN] Router has {len(router.tasks)} tasks but "
               f"{i + 1} adapters were loaded — verify alignment.")
 
+    router_task_names = [task.task_name for task in router.tasks]
+    if router_task_names != list(inference_tasks):
+        raise ValueError(
+            "Router task order must match --inference_tasks and adapter order. "
+            f"router={router_task_names}, inference={list(inference_tasks)}"
+        )
+
     adapter_names = [str(tr.task_id) for tr in router.tasks]
 
     # ── Routing helpers ────────────────────────────────────────────────────────
 
-    def route_sample(text: str) -> Tuple[int, torch.Tensor, torch.Tensor]:
+    def route_sample(text: str, oracle_task: Optional[str] = None) -> Tuple[int, torch.Tensor, torch.Tensor]:
         """Compute routing for a single source string.
 
         Feature extraction uses layers 0–(feature_layers-1) of the generation
@@ -669,6 +709,15 @@ def main():
           soft mode: alpha = softmax(s_k / τ)  (gmm_methodology.tex §5)
           scores are the raw z-scored GMM log-probs, saved for reuse in later rounds.
         """
+        if args.router_method == 'oracle':
+            task_names = [task.task_name for task in router.tasks]
+            if oracle_task not in task_names:
+                raise ValueError(f"Oracle task '{oracle_task}' is not present in {task_names}")
+            k_hat = task_names.index(oracle_task)
+            alpha = torch.zeros(len(router.tasks), dtype=torch.float32)
+            alpha[k_hat] = 1.0
+            return k_hat, alpha, alpha.clone()
+
         z = extract_routing_embedding(
             model=model,
             tokenizer=tokenizer,
@@ -814,7 +863,7 @@ def main():
                 # Routing: re-tokenise source text without left-padding so that the
                 # prefix pool (first 64 tokens) captures actual prompt content,
                 # matching the training feature extraction in gmm.py.
-                k_hat, alpha, in_scores = route_sample(sources[b])
+                k_hat, alpha, in_scores = route_sample(sources[b], task)
 
                 single_ids  = batch['input_ids'][b:b+1]
                 single_mask = batch['attention_mask'][b:b+1]
@@ -979,7 +1028,7 @@ def main():
                 in_scores = torch.tensor(saved_scores, dtype=torch.float32)
             else:
                 # Fallback: re-run input router (slower, for back-compat)
-                _, _, in_scores = route_sample(src)
+                _, _, in_scores = route_sample(src, task)
 
             # Extract first non-empty traceback from failed predictions
             candidates  = row.get("prediction", [])

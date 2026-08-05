@@ -22,6 +22,7 @@ except ImportError:
 class RouterConfig:
     model_name: str = "SalesForce/codet5-small"
     output_dir: str = "./router_gmm_ckpt"
+    feature_cache_dir: Optional[str] = None
     dataset_source: str = "codetask"
     executable_dataset_name: str = "ankhanhtran02/CL4Code-executable-datasets"
 
@@ -582,7 +583,8 @@ def get_or_extract_features(
     split: str,
     k: int,
 ) -> torch.Tensor:
-    path = feature_cache_path(cfg.output_dir, cfg.dataset_source, task, split, k, cfg.feature_layers, cfg.routing_dim)
+    cache_root = cfg.feature_cache_dir or cfg.output_dir
+    path = feature_cache_path(cache_root, cfg.dataset_source, task, split, k, cfg.feature_layers, cfg.routing_dim)
     ensure_dir(path.parent)
 
     if cfg.save_features and path.exists() and not cfg.force_recompute_features:
@@ -766,6 +768,12 @@ def build_argparser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser()
     p.add_argument("--model_name", type=str, default=RouterConfig.model_name)
     p.add_argument("--output_dir", type=str, default=RouterConfig.output_dir)
+    p.add_argument(
+        "--feature_cache_dir",
+        type=str,
+        default=None,
+        help="Optional shared feature-cache root. Defaults to <output_dir>/features.",
+    )
     p.add_argument("--dataset_source", type=str, default=RouterConfig.dataset_source, choices=["codetask", "executable"])
     p.add_argument("--executable_dataset_name", type=str, default=RouterConfig.executable_dataset_name)
     p.add_argument(
@@ -804,6 +812,7 @@ def main() -> None:
     cfg = RouterConfig(
         model_name=args.model_name,
         output_dir=args.output_dir,
+        feature_cache_dir=args.feature_cache_dir,
         dataset_source=args.dataset_source,
         executable_dataset_name=args.executable_dataset_name,
         tasks=parse_tasks(args.tasks, default_tasks),
