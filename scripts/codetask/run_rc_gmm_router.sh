@@ -17,7 +17,17 @@ cd "$REPO_ROOT"
 export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}
 export PYTHONUNBUFFERED=1
 
+# Set PYTHON_BIN explicitly when Bash/WSL does not inherit the Windows Python PATH.
+# Example (Git Bash):
+#   PYTHON_BIN=/c/Users/<user>/anaconda3/python.exe bash scripts/codetask/run_rc_gmm_router.sh
 PYTHON_BIN=${PYTHON_BIN:-python}
+if ! command -v "$PYTHON_BIN" >/dev/null 2>&1 && [[ ! -x "$PYTHON_BIN" ]]; then
+  echo "[rc-gmm] Python executable not found: $PYTHON_BIN" >&2
+  echo "[rc-gmm] Set PYTHON_BIN to the Python that has this project's dependencies." >&2
+  echo "[rc-gmm] Example: PYTHON_BIN=/c/Users/<user>/anaconda3/python.exe bash $0" >&2
+  exit 127
+fi
+
 MODEL=${MODEL:-Qwen/Qwen2.5-Coder-1.5B}
 OUTPUT_DIR=${OUTPUT_DIR:-./router/router_rc_gmm_codetask_dual}
 LOG_DIR=${LOG_DIR:-./logs/rc_gmm_codetask_dual}
