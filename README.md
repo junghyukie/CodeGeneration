@@ -80,8 +80,9 @@ INSTALL_DEPS=0 RUN_INFERENCE=0 bash scripts/codetask/run_router_ablation.sh
 
 ## PBC-GMM router
 
-`gmm_pbc.py` implements Selective Pairwise Boundary Calibration on top of
-calibrated per-task GMM scores. It uses disjoint GMM-fit, boundary-fit, and
+`gmm_pbc.py` implements Selective Pairwise Boundary Calibration on top of the
+same raw GMM log-likelihood scores used by `gmm.py` (plus a shared uniform
+log-prior). It uses disjoint GMM-fit, boundary-fit, and
 boundary-certification splits. Candidate boundaries are certified with a
 one-sided stratified paired bootstrap before they can affect low-margin top-2
 decisions.
@@ -141,7 +142,7 @@ python gmm_pbc.py \
 
 The output directory contains `config.json`, `representation_manifest.json`,
 `projection_P.pt`, `router_stepN.pt`, `boundary_calibration_results.json`, and
-`routing_results.json`. The latter reports both the calibrated-GMM baseline
+`routing_results.json`. The latter reports both the raw-GMM baseline
 (`b=0`) and PBC-GMM accuracy. Feature caches are namespaced by the model,
 tokenizer, projection hash, seed, and data/representation settings; reuse a
 shared cache only through `--feature_cache_dir`.
@@ -154,4 +155,63 @@ Run the focused unit tests with:
 
 ```bash
 python -m pytest -q tests/test_gmm_pbc.py
+```
+
+## MC-GMM router
+
+`gmm_mc.py` implements Minimum-Change Historical Envelope Preservation. It
+keeps the frozen representation and diagonal GMM from `gmm.py`, uses the raw
+score `log q_k(z)`, and adds only an `M`-scalar component-conditioned
+correction `gamma_k(z)^T u_k` to each task. Old GMMs and accepted correction
+vectors are never updated.
+
+For each new task, training features are split into independent GMM-fit,
+correction-optimization, and deployment-certification subsets (default
+`70% / 15% / 15%`). Historical optimization and certification probes are
+drawn independently from the frozen old GMMs. The minimum-change slack QP is
+solved through its box-constrained dual. A candidate is deployed only when:
+
+- the one-sided paired-bootstrap LCB for new-task routing gain is positive; and
+- the one-sided Hoeffding UCB for model-based historical disturbance is at most
+  `old_disturbance_budget`.
+
+Otherwise `u_t=0`, which gives the unmodified raw-GMM score for the new task.
+The historical guarantee is model-based because old probes come from stored
+GMMs rather than discarded raw examples.
+
+Run CodeTask:
+
+```bash
+bash scripts/codetask/run_gmm_mc.sh
+```
+
+Run all executable-language tasks:
+
+```bash
+bash scripts/executable/run_gmm_mc.sh
+```
+
+Small smoke runs:
+
+```bash
+TASKS=CONCODE,CodeTrans TRAIN_K=200 EVAL_K=100 \
+OLD_PSEUDO_OPT_SAMPLES=500 OLD_PSEUDO_CERT_SAMPLES=5000 \
+BOOTSTRAP_REPLICATES=500 bash scripts/codetask/run_gmm_mc.sh
+
+TASKS=python,cpp TRAIN_K=200 EVAL_K=100 \
+OLD_PSEUDO_OPT_SAMPLES=500 OLD_PSEUDO_CERT_SAMPLES=5000 \
+BOOTSTRAP_REPLICATES=500 bash scripts/executable/run_gmm_mc.sh
+```
+
+Important environment controls are `C_NEW`, `C_OLD`, `HISTORICAL_MARGIN`,
+`NEW_MARGIN`, `OLD_MARGIN`, `OLD_DISTURBANCE_BUDGET`, `CONFIDENCE_ALPHA`, and
+`BOOTSTRAP_REPLICATES`. Both scripts also support `CUDA_VISIBLE_DEVICES`,
+`MODEL`, `OUTPUT_DIR`, `FEATURE_CACHE_DIR`, `RESUME_FROM`, and `DRY_RUN=1`.
+
+The output directory contains `config.json`, `representation_manifest.json`,
+`projection_P.pt`, `router_stepN.pt`, `minimum_change_results.json`, and
+`routing_results.json`. Run focused tests with:
+
+```bash
+python -m pytest -q tests/test_gmm_mc.py
 ```

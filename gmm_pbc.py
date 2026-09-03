@@ -458,13 +458,6 @@ class TaskRouter:
     task_name: str
     task_id: int
     gmm: WeightedDiagonalGMM
-    calibration_mean: float
-    calibration_std: float
-
-    def calibrated_score(self, z: torch.Tensor, eps: float) -> torch.Tensor:
-        return (self.gmm.log_prob(z) - self.calibration_mean) / (
-            self.calibration_std + eps
-        )
 
 
 @dataclass(frozen=True)
@@ -631,17 +624,11 @@ class PBCGMMRouter:
         )
         fit_log_prob = gmm.log_prob(z_gmm_fit)
         if not torch.isfinite(fit_log_prob).all():
-            raise RuntimeError("Fitted GMM produced non-finite calibration scores")
-        calibration_mean = float(fit_log_prob.mean())
-        calibration_std = float(fit_log_prob.std(unbiased=False))
-        if not math.isfinite(calibration_mean) or not math.isfinite(calibration_std):
-            raise RuntimeError("Calibration statistics must be finite")
+            raise RuntimeError("Fitted GMM produced non-finite log probabilities")
         task_router = TaskRouter(
             task_name=task_name,
             task_id=task_id,
             gmm=gmm,
-            calibration_mean=calibration_mean,
-            calibration_std=calibration_std,
         )
 
         pending_boundaries: Dict[Tuple[int, int], float] = {}
@@ -663,23 +650,23 @@ class PBCGMMRouter:
                 seed=pair_seed + 29,
             )
 
-            fit_new_margins = task_router.calibrated_score(
-                z_boundary_fit, self.cfg.eps
-            ) - old_task.calibrated_score(z_boundary_fit, self.cfg.eps)
-            fit_old_margins = task_router.calibrated_score(
-                old_boundary_fit, self.cfg.eps
-            ) - old_task.calibrated_score(old_boundary_fit, self.cfg.eps)
+            fit_new_margins = task_router.gmm.log_prob(
+                z_boundary_fit
+            ) - old_task.gmm.log_prob(z_boundary_fit)
+            fit_old_margins = task_router.gmm.log_prob(
+                old_boundary_fit
+            ) - old_task.gmm.log_prob(old_boundary_fit)
             fit_result = find_optimal_boundary(
                 fit_new_margins,
                 fit_old_margins,
             )
 
-            cert_new_margins = task_router.calibrated_score(
-                z_boundary_cert, self.cfg.eps
-            ) - old_task.calibrated_score(z_boundary_cert, self.cfg.eps)
-            cert_old_margins = task_router.calibrated_score(
-                old_boundary_cert, self.cfg.eps
-            ) - old_task.calibrated_score(old_boundary_cert, self.cfg.eps)
+            cert_new_margins = task_router.gmm.log_prob(
+                z_boundary_cert
+            ) - old_task.gmm.log_prob(z_boundary_cert)
+            cert_old_margins = task_router.gmm.log_prob(
+                old_boundary_cert
+            ) - old_task.gmm.log_prob(old_boundary_cert)
             certification = certify_boundary(
                 cert_new_margins,
                 cert_old_margins,
@@ -735,8 +722,9 @@ class PBCGMMRouter:
     def predict_scores(self, z: torch.Tensor) -> torch.Tensor:
         if not self.tasks:
             raise RuntimeError("No fitted tasks available")
+        log_prior = math.log(1.0 / len(self.tasks))
         return torch.stack(
-            [task.calibrated_score(z, self.cfg.eps) for task in self.tasks],
+            [task.gmm.log_prob(z) + log_prior for task in self.tasks],
             dim=1,
         )
 
@@ -760,7 +748,7 @@ class PBCGMMRouter:
         output_dir = ensure_dir(output_dir)
         path = output_dir / f"router_step{step}.pt"
         payload = {
-            "format_version": 1,
+            "format_version": 2,
             "cfg": asdict(self.cfg),
             "step": step,
             "representation_manifest": self.representation_manifest,
@@ -769,8 +757,6 @@ class PBCGMMRouter:
                     "task_name": task.task_name,
                     "task_id": task.task_id,
                     "gmm": task.gmm.to_dict(),
-                    "calibration_mean": task.calibration_mean,
-                    "calibration_std": task.calibration_std,
                 }
                 for task in self.tasks
             ],
@@ -796,7 +782,7 @@ class PBCGMMRouter:
     @classmethod
     def load(cls, path: str | Path) -> "PBCGMMRouter":
         payload = torch.load(path, map_location="cpu", weights_only=True)
-        if not isinstance(payload, dict) or payload.get("format_version") != 1:
+        if not isinstance(payload, dict) or payload.get("format_version") != 2:
             raise ValueError("Unsupported or malformed PBC-GMM checkpoint")
         for required_key in ("cfg", "tasks", "boundaries", "boundary_records"):
             if required_key not in payload:
@@ -812,14 +798,6 @@ class PBCGMMRouter:
         if task_ids != list(range(len(task_ids))):
             raise ValueError("Checkpoint task IDs must be sequential from zero")
         for item in payload["tasks"]:
-            calibration_mean = float(item["calibration_mean"])
-            calibration_std = float(item["calibration_std"])
-            if (
-                not math.isfinite(calibration_mean)
-                or not math.isfinite(calibration_std)
-                or calibration_std < 0.0
-            ):
-                raise ValueError("Checkpoint calibration statistics are invalid")
             gmm = WeightedDiagonalGMM.from_dict(item["gmm"])
             if gmm.state is None or gmm.state.mu.shape[1] != router.cfg.routing_dim:
                 raise ValueError("GMM checkpoint dimension does not match routing_dim")
@@ -828,8 +806,6 @@ class PBCGMMRouter:
                     task_name=item["task_name"],
                     task_id=int(item["task_id"]),
                     gmm=gmm,
-                    calibration_mean=calibration_mean,
-                    calibration_std=calibration_std,
                 )
             )
         valid_task_ids = set(task_ids)
@@ -1282,7 +1258,7 @@ def evaluate_seen_tasks(
 def print_eval(step: int, seen_tasks: List[str], result: EvalResult) -> None:
     print("\n" + "=" * 90)
     print(f"[eval] step={step} seen_tasks={seen_tasks}")
-    print(f"[eval] calibrated-GMM baseline acc = {result.baseline_overall_acc:.4f}")
+    print(f"[eval] raw GMM baseline acc        = {result.baseline_overall_acc:.4f}")
     print(f"[eval] PBC-GMM routing acc        = {result.overall_acc:.4f}")
     print(f"[eval] prediction correction rate = {result.correction_rate:.4f}")
     for task_name in seen_tasks:

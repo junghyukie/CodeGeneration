@@ -1,4 +1,5 @@
 import json
+import math
 import sys
 import types
 
@@ -146,6 +147,33 @@ def test_router_checkpoint_round_trip_preserves_scores_and_boundaries(tmp_path):
     assert restored.boundaries == router.boundaries
     assert restored.boundary_records == router.boundary_records
     assert restored.representation_manifest == router.representation_manifest
+
+
+def test_router_scores_match_raw_gmm_scores_with_uniform_prior():
+    cfg = RouterConfig(
+        tasks=("old", "new"),
+        routing_dim=1,
+        gmm_components=1,
+        em_iters=5,
+        old_pseudo_fit_samples=20,
+        old_pseudo_cert_samples=20,
+        bootstrap_replicates=20,
+        seed=19,
+    )
+    router = PBCGMMRouter(cfg)
+    router.fit_new_task("old", 0, torch.linspace(-2.0, 0.0, 20).unsqueeze(1))
+    router.fit_new_task("new", 1, torch.linspace(0.5, 2.5, 20).unsqueeze(1))
+    query = torch.tensor([[-1.0], [1.5]])
+
+    expected = torch.stack(
+        [
+            task.gmm.log_prob(query) + math.log(1.0 / len(router.tasks))
+            for task in router.tasks
+        ],
+        dim=1,
+    )
+
+    torch.testing.assert_close(router.predict_scores(query), expected)
 
 
 def test_cli_exposes_reproducible_pbc_controls():
