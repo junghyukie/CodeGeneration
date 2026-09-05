@@ -305,14 +305,23 @@ def _soft_disagree_explore(
     When they disagree strongly (high JSD), blend toward the uniform to
     avoid committing to either router's noisy signal.
     """
+    # Mixture distribution m = 0.5*(p+q); the reference point both KL terms measure against.
     m = 0.5 * (w_input + w_trace)
     eps = 1e-8
-    kl_pm = (w_input * (w_input.clamp_min(eps) / m.clamp_min(eps)).log()).sum()
-    kl_qm = (w_trace * (w_trace.clamp_min(eps) / m.clamp_min(eps)).log()).sum()
+    # KL(p||m) computed with log base 2 (bits), not natural log — this is what
+    # bounds JSD in [0, 1] rather than [0, ln 2].
+    kl_pm = (w_input * torch.log2(w_input.clamp_min(eps) / m.clamp_min(eps))).sum()
+    # KL(q||m), same log-2 convention as kl_pm.
+    kl_qm = (w_trace * torch.log2(w_trace.clamp_min(eps) / m.clamp_min(eps))).sum()
+    # JSD = 0.5*KL(p||m) + 0.5*KL(q||m); already in [0, 1] by construction, the
+    # clamp only guards against floating-point overshoot at the boundary.
     js = float((0.5 * (kl_pm + kl_qm)).clamp(0.0, 1.0).item())
     K = w_input.shape[0]
+    # Combined posterior from the two routers' summed log-scores.
     w_posterior = F.softmax(s_input + s_trace, dim=0)
+    # Uniform fallback over the K tasks, used when the routers disagree.
     w_uniform = torch.ones(K, dtype=torch.float32) / K
+    # JSD-gated blend: js=0 -> pure posterior, js=1 -> pure uniform.
     return (1.0 - js) * w_posterior + js * w_uniform
 
 
