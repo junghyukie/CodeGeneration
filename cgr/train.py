@@ -75,9 +75,27 @@ def _epoch_schedule(n: int, epochs: int, bs: int, rng: random.Random) -> List[Li
     return out
 
 
+def _accumulate(state: CGRState, task: TaskData, row: int, idx: List[int], mb: int):
+    """Accumulate the gradient of one batch over micro-batches of size mb. The loss is normalised by the whole
+    batch (target tokens or sequences), so the gradient does not depend on mb."""
+    batches = [_collate(state, task.name, [task.train[i] for i in idx[s:s + mb]]) for s in range(0, len(idx), mb)]
+    if state.cfg.loss_normalization == "token":
+        denom = sum(int((b["labels"][:, 1:] != -100).sum()) for b in batches)
+    else:
+        denom = len(idx)
+    total = 0.0
+    for b in batches:
+        loss_sum, _ = _nll_sum(state, b, row)
+        (loss_sum / max(denom, 1)).backward()
+        total += float(loss_sum.detach())
+    return total, denom
+
+
 def run_phase(state: CGRState, task: TaskData, row: int, groups: List[dict], lr_lambdas: List[Callable],
               schedule: List[List[int]], log: Callable, phase: str) -> None:
-    """One optimizer over the whole schedule; each step is one batch of `cfg.batch_size` examples."""
+    """One optimizer over the whole schedule; each step is one batch of `cfg.batch_size` examples.
+    On CUDA out-of-memory (e.g. other processes on a shared GPU grew), the step is redone with half the
+    micro-batch; the reduced size is kept for the rest of the run and logged."""
     cfg = state.cfg
     params = [p for g in groups for p in g["params"]]
     for p in params:
@@ -85,19 +103,23 @@ def run_phase(state: CGRState, task: TaskData, row: int, groups: List[dict], lr_
     opt = torch.optim.AdamW(groups, betas=cfg.adam_betas, eps=1e-8)
     sched = torch.optim.lr_scheduler.LambdaLR(opt, lr_lambdas)
     state.model.train()
-    mb = cfg.micro_batch_size
     t0 = time.time()
     for step, idx in enumerate(schedule, start=1):
-        batches = [_collate(state, task.name, [task.train[i] for i in idx[s:s + mb]]) for s in range(0, len(idx), mb)]
-        if cfg.loss_normalization == "token":
-            denom = sum(int((b["labels"][:, 1:] != -100).sum()) for b in batches)
-        else:
-            denom = len(idx)
-        total = 0.0
-        for b in batches:
-            loss_sum, _ = _nll_sum(state, b, row)
-            (loss_sum / max(denom, 1)).backward()
-            total += float(loss_sum.detach())
+        while True:
+            mb = getattr(state, "micro_batch", cfg.micro_batch_size)
+            oom = False
+            try:
+                total, denom = _accumulate(state, task, row, idx, mb)
+            except torch.cuda.OutOfMemoryError:
+                if mb == 1:
+                    raise
+                oom = True
+            if not oom:
+                break
+            opt.zero_grad(set_to_none=True)
+            torch.cuda.empty_cache()
+            state.micro_batch = mb // 2
+            log({"phase": phase, "step": step, "oom": True, "micro_batch_size": state.micro_batch})
         torch.nn.utils.clip_grad_norm_(params, cfg.grad_clip)
         opt.step()
         sched.step()

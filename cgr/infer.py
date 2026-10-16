@@ -41,10 +41,27 @@ class Predictor:
         return out
 
 
-@torch.no_grad()
 def generate(st: CGRState, prompts: List[str], n_samples: int, alpha: Optional[np.ndarray] = None) -> List[List[str]]:
     """Internal generation with c^(l) = C^(l)T alpha for every adapted block; alpha=None disables all atoms
-    (pretrained backbone). Not a public entry point: methods call Predictor.predict."""
+    (pretrained backbone). Not a public entry point: methods call Predictor.predict.
+    On CUDA out-of-memory the batch is split in half and each half is generated (still one round per query)."""
+    oom = False
+    try:
+        return _generate_batch(st, prompts, n_samples, alpha)
+    except torch.cuda.OutOfMemoryError:
+        if len(prompts) == 1:
+            raise
+        oom = True
+    if oom:
+        torch.cuda.empty_cache()
+        h = len(prompts) // 2
+        print(f"[infer] CUDA OOM at batch {len(prompts)}; retrying as {h} + {len(prompts) - h}", flush=True)
+        return (generate(st, prompts[:h], n_samples, None if alpha is None else alpha[:h]) +
+                generate(st, prompts[h:], n_samples, None if alpha is None else alpha[h:]))
+
+
+@torch.no_grad()
+def _generate_batch(st: CGRState, prompts: List[str], n_samples: int, alpha: Optional[np.ndarray]) -> List[List[str]]:
     cfg, tok, model = st.cfg, st.tokenizer, st.model
     col = DataCollator(tok, padding="longest", max_prompt_len=cfg.max_prompt_len_infer, max_ans_len=cfg.max_new_tokens,
                        pad_to_multiple_of=8, inference=True)

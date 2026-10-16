@@ -264,6 +264,67 @@ class T10Determinism(unittest.TestCase):
             self.assertTrue(torch.equal(a, b))
 
 
+class OOMFallback(unittest.TestCase):
+    """Shared GPUs: on CUDA OOM, training halves the micro-batch (same gradient) and generation splits the batch."""
+
+    def _one_step(self, micro, fail_once=False):
+        import cgr.train as tr
+        cfg = tiny_cfg(lora_dropout=0.0, micro_batch_size=micro)
+        st = CGRState.create(cfg, tiny_model(), tiny_tokenizer())
+        st.bank.add_atom(); st.composition.add_row()
+        task = TaskData(0, "add", synth_task("add", 16), [])
+        real, calls = tr._nll_sum, {"n": 0}
+
+        def flaky(*a, **kw):
+            calls["n"] += 1
+            if fail_once and calls["n"] == 1:
+                raise torch.cuda.OutOfMemoryError("simulated")
+            return real(*a, **kw)
+
+        tr._nll_sum = flaky
+        logs = []
+        try:
+            torch.manual_seed(0)
+            params = st.bank.atom_parameters(0)
+            for p in params:
+                p.requires_grad_(True)
+            tr.run_phase(st, task, 0, [{"params": params, "lr": 1e-3, "weight_decay": 0.0}], [lambda s: 1.0],
+                         [list(range(8))], logs.append, "B")
+        finally:
+            tr._nll_sum = real
+        return [p.detach().clone() for p in params], logs, st
+
+    def test_training_microbatch_invariance_and_retry(self):
+        p4, _, _ = self._one_step(4)
+        p2, _, _ = self._one_step(2)
+        p4r, logs, st = self._one_step(4, fail_once=True)
+        for a, b, c in zip(p4, p2, p4r):
+            torch.testing.assert_close(a, b, rtol=1e-4, atol=1e-6)
+            torch.testing.assert_close(a, c, rtol=1e-4, atol=1e-6)
+        self.assertTrue(any(r.get("oom") for r in logs))
+        self.assertEqual(st.micro_batch, 2)
+
+    def test_generation_split(self):
+        import cgr.infer as inf
+        st = CGRState.create(tiny_cfg(), tiny_model(), tiny_tokenizer())
+        prompts = ["add 1 2", "add 3 4", "reverse the word abcd please"]
+        ref = inf.generate(st, prompts, 1, alpha=None)
+        real, calls = inf._generate_batch, {"n": 0}
+
+        def flaky(st_, ps, n, a):
+            calls["n"] += 1
+            if len(ps) > 1 and calls["n"] == 1:
+                raise torch.cuda.OutOfMemoryError("simulated")
+            return real(st_, ps, n, a)
+
+        inf._generate_batch = flaky
+        try:
+            out = inf.generate(st, prompts, 1, alpha=None)
+        finally:
+            inf._generate_batch = real
+        self.assertEqual(out, ref)
+
+
 class EndToEndSmoke(unittest.TestCase):
     """run_sequence.run -> eval.score -> eval.report for cgr (A3, A1), seqlora and base on two BLEU-scored tasks."""
 

@@ -43,11 +43,25 @@ Check the install. The acceptance tests (T1–T10 of methodology.tex Sec. 10, pl
 python -m unittest cgr.tests.test_acceptance -v
 ```
 
-**Hardware.** Each run uses **one GPU**. Training a single run across several GPUs is not implemented. On a multi-GPU node, the fast experiment runs 7 independent runs in parallel, one per GPU. On CodeTask, one run is expected to peak well below 46 GB:
-- **Training:** micro-batch 8 with gradient accumulation to batch 32. The longest task, KodCode, is 512+300 tokens per example.
-- **Generation:** batch 32.
+**Hardware.** Each run uses **one GPU**. Training a single run across several GPUs is not implemented. On a multi-GPU node, the fast experiment runs 7 independent runs in parallel, one per GPU.
 
-The `peak_gb` field at the end of Phase A and Phase B in each run's log reports the real peak. If a run goes out of memory, add `--override micro_batch_size=4` or `gradient_checkpointing=true`.
+**GPU memory (46 GB cards, 1–5 GB already used by other processes, so 41–45 GB free).** Estimated peak of one CodeTask run with the default settings:
+
+| Part | Estimate |
+|---|---|
+| Backbone weights (bf16) | ~3 GB |
+| Training activations, worst task (KodCode: micro-batch 8 × ≤ 816 tokens, gradients through blocks 4–27) | ~16 GB |
+| Loss over the vocabulary (answer tokens only, fp32) | ~4 GB |
+| Atoms, optimizer, CUDA context, allocator overhead | ~2–5 GB |
+| **Training peak** | **~23–28 GB** |
+| Generation (batch 32, KV cache, no gradients) | ~6 GB |
+
+The defaults therefore fit with 13+ GB to spare, so they are unchanged: micro-batch 8 (×4 accumulation = batch 32), generation batch 32. In case other processes on a GPU grow during a run, two safeguards apply:
+
+- **Training:** a step that runs out of memory is redone with half the micro-batch, and the smaller size is kept for the rest of the run. This gives the same gradient, because the loss is normalised over the whole batch of 32. The log shows `"oom": true` with the new size.
+- **Generation:** a batch that runs out of memory is split in half and generated again.
+
+The launcher prints each GPU's free memory before starting. It warns if a GPU has under 30 GB free; in that case start with `MICRO_BATCH=4 INFER_BATCH=16`. These are estimates: the `peak_gb` field at the end of Phase A and Phase B in each run's log reports the real peak. `gradient_checkpointing=true` (via `--override`) cuts activation memory further, at about 30% more training time.
 
 ---
 
@@ -119,13 +133,15 @@ Task order (thesis): CONCODE → CodeTrans → CodeSearchNet → BFP → KodCode
 ### Run it
 
 ```bash
+nvidia-smi --query-gpu=index,memory.used,memory.free --format=csv   # pick the 7 GPUs with the most free memory
 bash scripts/cgr/fast_codetask.sh                      # GPUs 0..6; override with GPUS="..." OUT=... MAX_TRAIN=... MAX_TEST=...
+                                                       #   and MICRO_BATCH=... INFER_BATCH=... (defaults 8 and 32)
 tail -f runs/fast_codetask/logs/A3_s1234.log           # JSON log lines: phase, step, train_loss, heldout_loss, tau, peak_gb
 cat runs/fast_codetask/A3_s1234/timing.json            # train/eval seconds per task (use task 1 to project the total)
 ```
 
 The script does the following:
-1. Prefetches the model and datasets.
+1. Prints each GPU's free memory, then prefetches the model and datasets.
 2. Starts the 7 GPU jobs. GPU 6 runs `BASE` first, then `SEQ_s42`.
 3. Waits for all of them.
 4. Scores everything and writes the report.
