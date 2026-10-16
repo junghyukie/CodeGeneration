@@ -22,14 +22,20 @@ CGR is the thesis GMM-Router with three changes:
 
 ## 1. Setup
 
+The cluster runs CUDA 12.6. `requirements.txt` pins `torch==2.1.0`, which has no CUDA 12.6 build. So install PyTorch 2.6.0 built for CUDA 12.6 first, then install the remaining requirements with the torch line removed. `requirements.txt` is UTF-16 encoded, hence the `iconv`.
+
 ```bash
 conda create -n cgr python=3.11 -y && conda activate cgr
-# Install a CUDA build of PyTorch that matches your driver first, e.g.:
-pip install torch==2.1.0 --index-url https://download.pytorch.org/whl/cu121
-pip install -r requirements.txt          # transformers 4.47.1, datasets, scipy, safetensors, tree-sitter (CodeBLEU), ...
+pip install torch==2.6.0 --index-url https://download.pytorch.org/whl/cu126
+iconv -f UTF-16 -t UTF-8 requirements.txt | grep -v '^torch==' > /tmp/requirements-cgr.txt
+pip install -r /tmp/requirements-cgr.txt # transformers 4.47.1, datasets, scipy, safetensors, tree-sitter (CodeBLEU), ...
+python -c "import torch; print(torch.__version__, torch.version.cuda, torch.cuda.is_available(), torch.cuda.device_count())"
+# expected: 2.6.0+cu126 12.6 True 7
 export HF_HOME=./.cache HF_DATASETS_CACHE=./.cache
 # huggingface-cli login                  # only if your HF account needs it for the datasets
 ```
+
+`nvidia-smi` should report `CUDA Version: 12.6` or higher. If `pip` ever replaces torch with a different build, rerun the first `pip install` line.
 
 Check the install. The acceptance tests (T1–T10 of methodology.tex Sec. 10, plus an end-to-end smoke test) run on CPU with a tiny random model in about 10 s:
 
