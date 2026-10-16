@@ -1,0 +1,62 @@
+This is BibTeX, Version 0.99d (TeX Live 2023/Debian)
+Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
+The top-level auxiliary file: main.aux
+The style file: cas-model2-names.bst
+Database file #1: refs.bib
+Reallocated singl_function (elt_size=4) to 100 items from 50.
+Warning--empty pages in chai2024mceval
+Warning--empty pages in chaudhry2019agem
+Warning--empty pages in cheng2025exploiting
+Warning--empty pages in fried2023incoder
+Warning--empty pages in guo2021graphcodebert
+Warning--empty pages in he2025cllora
+Warning--empty pages in hu2022lora
+Warning--empty pages in lopezpaz2017gem
+Warning--empty pages in qian2025treelora
+Warning--empty pages in razdaibiedina2023progressive
+Warning--empty pages in shazeer2017outrageously
+Warning--empty pages in shin2017continual
+Warning--empty pages in vaswani2017attention
+Warning--empty pages in wang2025continual
+You've used 67 entries,
+            2990 wiz_defined-function locations,
+            1063 strings with 21683 characters,
+and the built_in function-call counts, 57642 in all, are:
+= -- 4007
+> -- 3430
+< -- 34
++ -- 1317
+- -- 1236
+* -- 6757
+:= -- 8431
+add.period$ -- 167
+call.type$ -- 67
+change.case$ -- 739
+chr.to.int$ -- 65
+cite$ -- 81
+duplicate$ -- 3940
+empty$ -- 3546
+format.name$ -- 1443
+if$ -- 10594
+int.to.chr$ -- 3
+int.to.str$ -- 1
+missing$ -- 830
+newline$ -- 316
+num.names$ -- 268
+pop$ -- 1596
+preamble$ -- 1
+purify$ -- 672
+quote$ -- 0
+skip$ -- 1287
+stack$ -- 0
+substring$ -- 1833
+swap$ -- 3172
+text.length$ -- 21
+text.prefix$ -- 0
+top$ -- 0
+type$ -- 600
+warning$ -- 14
+while$ -- 287
+width$ -- 0
+write$ -- 887
+(There were 14 warnings)

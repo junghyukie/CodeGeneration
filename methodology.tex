@@ -1,0 +1,704 @@
+% =====================================================================
+%  Compositional GMM-Router (CGR) -- Implementation Specification
+%  Build: pdflatex compositional_gmm_router_spec.tex   (run twice)
+% =====================================================================
+\documentclass[11pt]{article}
+\usepackage[margin=2.2cm]{geometry}
+\usepackage{amsmath,amssymb,bm}
+\usepackage{booktabs,tabularx,array}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true,linkcolor=blue!50!black,urlcolor=blue!50!black,citecolor=blue!50!black}
+
+% ---------- macros ----------
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\T}{^{\top}}
+\newcommand{\tagthesis}{\textsuperscript{\textcolor{teal!70!black}{\sffamily[thesis]}}}
+\newcommand{\tagnew}{\textsuperscript{\textcolor{orange!80!black}{\sffamily[new]}}}
+\newcommand{\tagassumed}{\textsuperscript{\textcolor{red!70!black}{\sffamily[assumed]}}}
+\newcommand{\MUST}{\textbf{MUST}}
+\newcommand{\MUSTNOT}{\textbf{MUST NOT}}
+\newcommand{\SHOULD}{\textbf{SHOULD}}
+\newcommand{\MAY}{\textbf{MAY}}
+\newcommand{\Ladapt}{\mathcal{L}_{\mathrm{ad}}}
+\newcommand{\role}{\par\noindent\textbf{Role.}\ }
+\newcommand{\impl}{\par\noindent\textbf{Implementation requirements.}\ }
+
+\lstset{
+  language=Python,
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{blue!60!black}\bfseries,
+  commentstyle=\color{green!40!black},
+  stringstyle=\color{red!50!black},
+  frame=single,
+  breaklines=true,
+  columns=fullflexible,
+  showstringspaces=false
+}
+
+\algnewcommand{\LineComment}[1]{\State \(\triangleright\) #1}
+
+\title{\textbf{Compositional GMM-Router (CGR)}\\[4pt]
+\large Leak-free routing with learned cross-task transfer for continual code generation\\[2pt]
+\normalsize Implementation specification}
+\author{}
+\date{October 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent This document fully specifies the Compositional GMM-Router (CGR), an extension of the GMM-Router of the
+graduation thesis \emph{Tran An Khanh (HUST, 2026)}. CGR removes the thesis's iterative refinement pipeline
+(calibration inference, traceback router, adapter refinement on repair pairs, JSD-gated Round-2), because those
+stages pass ground-truth task identity to later stages through the compiler and the test function. CGR adds
+explicit, learned knowledge transfer between tasks while keeping per-task isolation of trained parameters. The
+document is written so that an implementing agent can build, test and evaluate the method from this file alone.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+% =====================================================================
+\section{How to use this document}
+% =====================================================================
+
+\paragraph{Audience.} An implementing agent (e.g.\ Claude Code) or engineer. Every component is given as
+(i)~a formulation, (ii)~its role in the method, and (iii)~implementation requirements.
+
+\paragraph{Normative language.} \MUST\ and \MUSTNOT\ are hard requirements; violating them invalidates the
+method (in particular the leak-free property). \SHOULD\ is a strong default that may be changed only with a
+logged reason. \MAY\ marks optional optimisations.
+
+\paragraph{Provenance tags.} Values tagged \tagthesis\ are taken from the GMM-Router thesis and keep the setup
+comparable. Values tagged \tagnew\ are introduced by CGR and are tunable. Values tagged \tagassumed\ are not
+stated in the thesis; the implementer \MUST\ check them against the thesis codebase if it is available and
+record the value actually used.
+
+\paragraph{Relationship to the thesis codebase.} If the GMM-Router codebase is available, the implementer
+\SHOULD\ reuse its data loading, instruction templates, tokenisation, decoding settings and evaluation harness
+(BLEU, CodeBLEU, Pass@$k$ execution), and \MUST\ replace its router and adapter modules with the components of
+Section~\ref{sec:components}. The following thesis code paths \MUST\ be deleted or made unreachable from CGR:
+calibration inference (thesis Step~2), adapter refinement (Step~3a), traceback GMM fitting (Step~3b), Round-2
+inference and JSD-gated score combination (Step~5). The calibration split is not used by CGR.
+
+\paragraph{Build order (milestones).}
+\begin{enumerate}[label=M\arabic*., leftmargin=*]
+  \item Routing encoder, diagonal EM, within-task scatter and router scoring (Sections~\ref{sec:embed}--\ref{sec:score}).
+        Pass tests T1--T4 (Section~\ref{sec:tests}).
+  \item Atom bank and composition matrix with $C=I$; confirm that CGR then reduces to thesis GMM-Router Round-1
+        (merge equivalence, test T5).
+  \item Transfer prior, $\beta$ initialisation and two-phase training (Sections~\ref{sec:prior}--\ref{sec:train});
+        pass tests T6--T7.
+  \item Inference API with leakage and no-replay guards (Section~\ref{sec:infer}); pass tests T8--T10.
+  \item Full task sequences on both benchmarks, evaluation matrix, continual-learning metrics, and the ablation
+        grid of Section~\ref{sec:ablations}.
+\end{enumerate}
+
+% =====================================================================
+\section{Method summary}
+% =====================================================================
+
+\noindent\textbf{Title:} Compositional GMM-Router
+
+\medskip
+\noindent\textbf{Research hypothesis:} Separating task identification from knowledge reuse can give cross-task
+transfer comparable to parameter-sharing methods while keeping the near-zero forgetting of per-task isolation.
+Identification means routing each query from its input alone with a shared-covariance GMM. Reuse means building
+each new expert as a learned combination of frozen earlier LoRAs plus a fresh residual. Neither part needs
+previous-task data, execution feedback, or extra forward passes at inference.
+
+\medskip
+\noindent For each arriving task, we use the existing GMM router to measure how strongly the new task's inputs
+resemble each earlier task. We initialize one lateral weight per earlier LoRA from that affinity, then train these
+weights together with a fresh residual LoRA on the new task's data while all earlier LoRAs stay frozen. At
+inference, routing weights computed from the input alone pass through the learned lateral weights to merge every
+LoRA into one adapter. The output is generated in a single round with no calibration, traceback, compiler or test
+function.
+
+\paragraph{Pipeline at a glance.} For each task $k$: (1)~embed the task's prompts with the frozen backbone;
+(2)~compute the router's affinity of task $k$ to earlier tasks and initialise lateral weights; (3)~fit and
+register task $k$'s GMM and add its within-task scatter to the shared covariance; (4)~calibrate the routing
+temperature on a held-out slice of task $k$; (5)~Phase~A: train lateral weights only; (6)~Phase~B: train a new
+LoRA atom and the lateral weights; (7)~freeze everything belonging to task $k$. At inference: embed
+$\rightarrow$ score $\rightarrow$ route $\rightarrow$ compose $\rightarrow$ generate once.
+
+% =====================================================================
+\section{Hard constraints (invariants)}\label{sec:invariants}
+% =====================================================================
+
+\begin{enumerate}[label=I\arabic*., leftmargin=*]
+  \item \textbf{No task identity at inference.} The prediction function \MUST\ accept only prompt strings.
+        It \MUSTNOT\ receive or look up task index, language label, dataset name, test cases or any other metadata.
+        Task labels may be attached to outputs only \emph{after} generation, for evaluation.
+  \item \textbf{Single generation round.} Each query is generated exactly once (with $n$ samples drawn in that one
+        round for Pass@$k$). There is no iterative refinement, no Round-2, no regeneration conditioned on earlier
+        outputs, and no re-ranking or selection of candidates by any execution signal.
+  \item \textbf{No execution feedback anywhere in the method.} No compiler, interpreter, test harness, runtime
+        error message or traceback is used in training, routing, calibration or inference. Execution happens only
+        in the evaluation harness, which reads generation files after all generation has finished and writes
+        nothing back into the method's state.
+  \item \textbf{No previous-task data.} After task $k$ is finished, its raw data, prompts, targets and routing
+        embeddings \MUSTNOT\ be used again by the method. Allowed persistent state is exactly the list in
+        Section~\ref{sec:state}. (Test sets of earlier tasks are read only by the evaluation harness.)
+  \item \textbf{Frozen backbone and frozen past.} Backbone weights are never updated. After task $k$ is finished,
+        atom $k$, row $k$ of every composition matrix, and GMM $k$ are frozen forever.
+  \item \textbf{Adapter-independent routing features.} Routing embeddings are computed from blocks that carry no
+        adapters (or, equivalently, with all adapters disabled).
+  \item \textbf{Inputs as given.} Prompts are used exactly as produced by the benchmark templates. No extra prefix
+        or token encoding task identity may be added beyond what the benchmark's own instruction contains.
+\end{enumerate}
+
+% =====================================================================
+\section{Notation and persistent state}\label{sec:state}
+% =====================================================================
+
+Tasks $T_1,\dots,T_K$ arrive in order; $D_k=\{(x_i,y_i)\}$ is the training set of task $k$ (prompt $x$, target $y$).
+$f_\theta$ is the frozen backbone with $L$ decoder blocks indexed $0,\dots,L-1$ and hidden size $d$.
+$\ell^*$ is the routing/split block. The adapted blocks are $\Ladapt=\{\ell^*,\dots,L-1\}$ and the adapted modules
+in each block are $u\in\{\texttt{q\_proj},\texttt{v\_proj}\}$. $p$ is the routing dimension, $M$ the number of
+GMM components per task, $r$ the LoRA rank.
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}l l X@{}}
+\toprule
+Symbol & Shape & Meaning (all items are frozen once written, except the running scatter and $\tau$)\\
+\midrule
+$P$ & $p\times d$ & Fixed orthonormal routing projection, $PP\T=I_p$.\\
+$(\pi_{km},\mu_{km},\sigma^2_{km})$ & $M$, $M\times p$, $M\times p$ & Diagonal GMM of task $k$ (weights, means, variances).\\
+$S_k$, $N_k$ & $p\times p$, scalar & Within-task scatter of task $k$ and number of embeddings used.\\
+$S$, $n$ & $p\times p$, scalar & Running sums $S=\sum_k S_k$, $n=\sum_k N_k$; $\bar\Sigma=S/n$.\\
+$(A_k^{(\ell,u)},B_k^{(\ell,u)})$ & $r\times d_{\mathrm{in}}$, $d_{\mathrm{out}}\times r$ & LoRA \emph{atom} of task $k$ at block $\ell\in\Ladapt$, module $u$.\\
+$\beta_{k}^{(\ell)}$ & $k-1$ per block & Lateral weights of task $k$ on earlier atoms at block $\ell$.\\
+$C^{(\ell)}$ & $K\times K$ & Lower-triangular composition matrix: $C_{kk}=1$, $C_{kj}=\beta^{(\ell)}_{kj}$ for $j<k$, $0$ above the diagonal.\\
+$\tau$ & scalar & Routing temperature (running calibrated value, Section~\ref{sec:score}).\\
+\bottomrule
+\end{tabularx}
+\caption{Persistent state of CGR. Nothing else may be stored across tasks.}
+\end{table}
+
+% =====================================================================
+\section{Components}\label{sec:components}
+% =====================================================================
+
+\subsection{Backbone, adapted layers and routing embedding}\label{sec:embed}
+
+\paragraph{Formulation.} For a prompt $x$ with $T$ tokens, let $H\in\R^{T\times d}$ be the hidden states after
+blocks $0,\dots,\ell^*-1$ (Hugging Face convention: \texttt{output\_hidden\_states[}$\ell^*$\texttt{]}, where index~0
+is the embedding output)\tagassumed. With token mask $m_t\in\{0,1\}$ (1 for non-padding prompt tokens):
+\begin{align}
+  \tilde h &= \frac{\sum_{t=1}^{T} m_t H_t}{\sum_{t=1}^{T} m_t}\in\R^{d}, \\
+  h &= \frac{\tilde h-\mathrm{mean}(\tilde h)\,\mathbf 1}{\mathrm{std}(\tilde h)+\epsilon_{\mathrm{LN}}}\in\R^{d}
+  \qquad\text{(parameter-free layer norm over the $d$ entries)}, \\
+  z(x) &= P\,h\in\R^{p}, \qquad P=Q\T,\quad QR=\mathrm{qr}(G),\quad G\in\R^{d\times p},\ G_{ij}\sim\mathcal N(0,1)\ \text{(seed $s_P$)}.
+\end{align}
+
+\role A fixed feature space that sees only the query. It is computed before any token is generated, so nothing
+generated, compiled or executed can influence routing (Invariant~I6). Because $P$ never changes, every task's
+GMM stays valid as tasks accumulate.
+
+\impl
+\begin{itemize}[leftmargin=*]
+  \item \MUST\ use the same prompt string and template as used for generation; prompt tokens only (no target
+        tokens); right truncation at 2048 tokens\tagthesis.
+  \item \MUST\ compute $h$ and $z$ in float32; $\mathrm{std}$ is the population standard deviation; $\epsilon_{\mathrm{LN}}=10^{-8}$.
+  \item \MUST\ generate $P$ once from seed $s_P$, save it, and reload it; it is never regenerated.
+  \item LoRA atoms are installed only on blocks $\ell\ge\ell^*$, so blocks $<\ell^*$ are adapter-free. The
+        implementer \MAY\ therefore read $H$ from the generation prefill instead of a separate forward pass, but test
+        T1 \MUST\ show that the result equals the adapters-disabled computation.
+\end{itemize}
+
+\subsection{Per-task diagonal GMM and within-task scatter}\label{sec:gmm}
+
+\paragraph{Formulation.} When task $k$ arrives, let $Z_k=\{z_i\}_{i=1}^{N_k}$ be routing embeddings of up to
+$N_{\max}=5000$\tagthesis\ prompts sampled (with a fixed seed) from the training part of $D_k$. Fit a diagonal
+GMM $p_k(z)=\sum_{m=1}^{M}\pi_{km}\,\mathcal N\!\big(z;\mu_{km},\mathrm{diag}(\sigma^2_{km})\big)$ by EM exactly as in
+the thesis (Algorithm~\ref{alg:em}): responsibilities
+\begin{equation}
+  r_{im}=\frac{\pi_{km}\,\mathcal N(z_i;\mu_{km},\mathrm{diag}\,\sigma^2_{km})}{\sum_{m'}\pi_{km'}\,\mathcal N(z_i;\mu_{km'},\mathrm{diag}\,\sigma^2_{km'})},
+\end{equation}
+M-step $\pi_{km}=N_m/N_k$, $\mu_{km}=\frac{1}{N_m}\sum_i r_{im}z_i$,
+$\sigma^2_{kmj}=\max\!\big(\frac1{N_m}\sum_i r_{im}(z_{ij}-\mu_{kmj})^2,\ \sigma^2_{\min}\big)$ with $N_m=\sum_i r_{im}$.
+After convergence, with responsibilities from a final E-step, compute the within-task scatter and update the
+running sums:
+\begin{equation}
+  S_k=\sum_{i=1}^{N_k}\sum_{m=1}^{M} r_{im}\,(z_i-\mu_{km})(z_i-\mu_{km})\T,\qquad
+  S\leftarrow S+S_k,\quad n\leftarrow n+N_k,\quad \bar\Sigma=S/n .
+\end{equation}
+
+\role GMM $k$ models where task $k$'s queries live in routing space. $S_k$ contributes task $k$'s within-task
+spread to a single covariance $\bar\Sigma$ that is shared by all tasks; this is what removes the advantage that
+broad task densities have over narrow ones (Section~\ref{sec:score}).
+
+\impl
+\begin{itemize}[leftmargin=*]
+  \item Initialisation\tagthesis: $\pi_{km}=1/M$; $\mu_{km}$ sampled uniformly without replacement from $Z_k$;
+        $\sigma^2_{km}$ set to the global per-dimension variance of $Z_k$ (floored at $\sigma^2_{\min}$).
+  \item E-step \MUST\ use log-sum-exp; convergence when the change of mean log-likelihood is below
+        $\delta=10^{-4}$ or after $T_{\max}=50$ iterations\tagthesis.
+  \item $S_k$ \MUST\ be accumulated in float64. Store $S_k$ per task as well as the running $S$ (needed by
+        ablations; it is a second-moment summary, not data).
+  \item After this step, $Z_k$ \MUST\ be discarded (Invariant~I4).
+\end{itemize}
+
+\subsection{Shared-covariance scoring and routing weights}\label{sec:score}
+
+\paragraph{Formulation.} With $K$ tasks registered and shrinkage $\lambda\in[0,1]$:
+\begin{align}
+  \Sigma_{km}(\lambda) &= (1-\lambda)\,\mathrm{diag}(\sigma^2_{km})+\lambda\big(\bar\Sigma+\epsilon_\Sigma I_p\big),\\
+  \log\mathcal N(z;\mu,\Sigma) &= -\tfrac12\Big(p\log 2\pi+\log\det\Sigma+(z-\mu)\T\Sigma^{-1}(z-\mu)\Big),\\
+  s_k(z) &= \operatorname{logsumexp}_{m}\Big[\log\pi_{km}+\log\mathcal N\big(z;\mu_{km},\Sigma_{km}(\lambda)\big)\Big]+\log\tfrac1K,\label{eq:score}\\
+  \alpha_k(x) &= \frac{\exp\big(s_k(z(x))/\tau\big)}{\sum_{j=1}^{K}\exp\big(s_j(z(x))/\tau\big)},\qquad
+  \hat k(x)=\arg\max_k s_k(z(x)).
+\end{align}
+Hard routing uses $\alpha(x)=e_{\hat k(x)}$. Setting $\lambda=0$ reproduces the thesis router (Eq.~4.6 of the thesis)
+exactly.
+
+\paragraph{Temperature calibration.} Raw score gaps are tens of nats (the thesis reports a 74.1-nat gap for one
+query), so $\tau=1$ behaves like hard routing. CGR sets $\tau$ without execution and without previous-task data:
+for each task $k\ge2$, using a held-out slice $H_k$ of $D_k$ (5\%, at most 500 prompts\tagnew) and the router
+\emph{after} registering task $k$,
+\begin{equation}
+  \tau_k=\arg\min_{\tau\in\mathcal T}\ -\frac{1}{|H_k|}\sum_{x\in H_k}\log\alpha_k(x;\tau),\qquad
+  \mathcal T=\{2^{-2},2^{-1},\dots,2^{8}\},\qquad
+  \tau=\exp\Big(\tfrac{1}{k-1}\textstyle\sum_{j=2}^{k}\log\tau_j\Big).
+\end{equation}
+
+\role Task identification from the query alone; this replaces the role the traceback router played in the thesis,
+without its leak. With $\lambda=1$, all tasks are measured in one metric, so a query far from every task is
+assigned to the nearest task mean in whitened space instead of to the broadest density. The thesis attributes the
+executable-benchmark collapse (15.8\% hard-routing accuracy, most queries routed to C++) to broad coverage by one
+GMM; the shared metric targets exactly that mechanism. The same scores feed the transfer prior
+(Section~\ref{sec:prior}).
+
+\impl
+\begin{itemize}[leftmargin=*]
+  \item \MUST\ compute scores in float64 using a Cholesky factor of each $\Sigma_{km}(\lambda)$
+        ($\log\det\Sigma=2\sum\log\mathrm{diag}\,L$; Mahalanobis term via a triangular solve).
+  \item Because $\bar\Sigma$ changes when a task is registered, all $K\cdot M$ Cholesky factors \MUST\ be
+        recomputed after each registration (stored GMM parameters do not change).
+  \item For $\lambda=0$, \MUST\ use the plain diagonal formula (no $\epsilon_\Sigma$), so that test T4 holds exactly.
+  \item On the CodeTask benchmark, hard routing is the default\tagthesis; soft routing with calibrated $\tau$ is
+        reported as an ablation. On the executable benchmark, soft routing with calibrated $\tau$ is the default.
+\end{itemize}
+
+\subsection{LoRA atom bank and composition matrix}\label{sec:atoms}
+
+\paragraph{Formulation.} Each task contributes one rank-$r$ LoRA \emph{atom} at every adapted block and module.
+For a frozen linear map $W^{(\ell,u)}$ and coefficient vector $c^{(\ell)}\in\R^{K}$:
+\begin{equation}
+  y=W^{(\ell,u)}x+\kappa\sum_{i=1}^{K}c^{(\ell)}_i\,B_i^{(\ell,u)}A_i^{(\ell,u)}\,\mathrm{drop}(x),\qquad
+  \kappa=\frac{\texttt{lora\_alpha}}{r}=2. \label{eq:atombank}
+\end{equation}
+The effective adapter of task $k$ is its own atom plus a learned combination of earlier atoms:
+\begin{equation}
+  \Delta W_k^{(\ell,u)}=B_k^{(\ell,u)}A_k^{(\ell,u)}+\sum_{j<k}\beta^{(\ell)}_{kj}B_j^{(\ell,u)}A_j^{(\ell,u)}
+  =\sum_{i=1}^{K}C^{(\ell)}_{ki}\,B_i^{(\ell,u)}A_i^{(\ell,u)},
+\end{equation}
+so task $k$ is executed by setting $c^{(\ell)}=C^{(\ell)\T}e_k$ (row $k$ of $C^{(\ell)}$).
+
+\role The explicit transfer channel. Each new task can reuse any earlier atom with a learned weight per block,
+including weight zero or negative weight. Earlier atoms and earlier rows of $C$ are frozen, so reuse can never
+change how an earlier task behaves; parameter-level forgetting stays at zero, as in the thesis.
+
+\impl
+\begin{itemize}[leftmargin=*]
+  \item Atoms are installed on \texttt{q\_proj} and \texttt{v\_proj} of blocks $\ell\in\Ladapt$ only;
+        $r=16$, $\texttt{lora\_alpha}=32$, dropout $0.1$ on the atom input, no bias\tagthesis.
+  \item $\beta^{(\ell)}_{k}$ is one scalar per (adapted block, earlier atom), shared by \texttt{q\_proj} and
+        \texttt{v\_proj} in that block\tagnew; unconstrained real values.
+  \item \SHOULD\ implement Eq.~\eqref{eq:atombank} without materialising merged weights, by concatenating
+        the atoms and scaling the rank dimension:
+        \begin{gather*}
+          A_{\mathrm{cat}}=[A_1;\dots;A_K]\in\R^{Kr\times d_{\mathrm{in}}},\qquad
+          B_{\mathrm{cat}}=[B_1,\dots,B_K]\in\R^{d_{\mathrm{out}}\times Kr},\\
+          y=Wx+\kappa\,B_{\mathrm{cat}}\big((c\otimes\mathbf 1_r)\odot A_{\mathrm{cat}}\,\mathrm{drop}(x)\big).
+        \end{gather*}
+        This supports a different $c$ per example in a batch and is mathematically identical to weight merging.
+  \item New atom initialisation: $A_k$ Kaiming-uniform (PEFT default), $B_k=0$.
+  \item Atoms and $\beta$ are kept in float32; the backbone in bf16\tagnew.
+\end{itemize}
+
+\subsection{Router-derived transfer prior and $\beta$ initialisation}\label{sec:prior}
+
+\paragraph{Formulation.} \emph{Before} registering task $k$ ($k\ge2$), score its embeddings against the $k-1$
+existing tasks only:
+\begin{equation}
+  a_{kj}=\frac{1}{N_k}\sum_{i=1}^{N_k}\frac{\exp\big(s_j(z_i)/\tau_{\mathrm{aff}}\big)}{\sum_{j'<k}\exp\big(s_{j'}(z_i)/\tau_{\mathrm{aff}}\big)},\qquad j<k,\qquad \tau_{\mathrm{aff}}=1,
+\end{equation}
+and initialise the lateral weights as the affinity-weighted merge of earlier \emph{effective} adapters:
+\begin{equation}
+  \beta^{(\ell)}_{kj}\leftarrow\sum_{i<k}a_{ki}\,C^{(\ell)}_{ij}\quad (j<k),\qquad\text{equivalently}\qquad
+  \Delta W_k^{(\ell,u)}\big|_{\text{init}}=\sum_{i<k}a_{ki}\,\Delta W_i^{(\ell,u)}\quad(\text{with }B_k=0).
+\end{equation}
+
+\role The router's data-free guess of which earlier tasks are related to task $k$. Training starts from roughly
+the adapter the current system would already apply to task $k$'s inputs, so learning can only move away from it
+if task $k$'s data says so.
+
+\impl For $k=1$ there are no earlier atoms and no $\beta$. For $k=2$, $a_{21}=1$.
+
+\subsection{Two-phase training}\label{sec:train}
+
+\paragraph{Formulation.} The loss for task $k$ is the masked negative log-likelihood of the target under task
+$k$'s effective adapter:
+\begin{equation}
+  \mathcal L_k=-\frac{1}{|\mathcal B|}\sum_{(x,y)\in\mathcal B}\sum_{t=1}^{|y|}\log p\big(y_t\mid x,y_{<t};\ c^{(\ell)}=C^{(\ell)\T}e_k\ \forall\ell\big),
+\end{equation}
+with prompt and padding tokens masked out of the loss\tagthesis.
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Phase A (compose).} Trainable: $\{\beta^{(\ell)}_k\}_{\ell\in\Ladapt}$ only. Atom $k$ is held at
+        $B_k=0$ (contributes nothing). $S_A=300$ steps, batch 32, AdamW, $\eta_A=5\times10^{-3}$, no weight decay\tagnew.
+        Skipped for $k=1$.
+  \item \textbf{Phase B (specialise).} Trainable: atom $k$ ($A_k,B_k$) and $\beta_k$. Atom: AdamW,
+        $\eta=10^{-4}$, weight decay $0.01$, warmup ratio $0.01$, 3 epochs, batch 32\tagthesis.
+        $\beta_k$: learning rate $\eta_\beta=2\times10^{-5}$, no weight decay\tagnew.
+  \item After Phase B, freeze atom $k$ and row $k$ of every $C^{(\ell)}$ (Invariant~I5).
+\end{itemize}
+
+\role The affinity is only a guess. Phase~A corrects it with task $k$'s own data: it keeps atoms that help and
+pushes misleading ones toward zero or below. A typical misleading case is two tasks with similar inputs but
+incompatible outputs, such as the Ruby inputs of CodeSearchNet (summarisation) and RunBugRun (repair). Phase~A's
+loss is also a direct measurement of forward transfer, i.e.\ how much of task $k$ existing knowledge already
+solves. Phase~B lets the new atom learn only what earlier atoms cannot express. Because $B_k$ starts at zero,
+Phase~B starts exactly from the Phase-A composition (test T6).
+
+\impl Use the final weights of each phase (no early stopping)\tagnew; log the loss on $H_k$ at the end of
+Phase~A and every 500 steps of Phase~B. Maximum 100{,}000 training examples per task\tagthesis.
+
+\subsection{Inference: composed merging and generation}\label{sec:infer}
+
+\paragraph{Formulation.} For a query $x$:
+\begin{equation}
+  z=z(x),\qquad \alpha=\alpha(x)\ \text{(soft) or } e_{\hat k(x)}\ \text{(hard)},\qquad
+  c^{(\ell)}(x)=C^{(\ell)\T}\alpha(x)\quad\forall\ell\in\Ladapt,
+\end{equation}
+then generate once with Eq.~\eqref{eq:atombank} using $c^{(\ell)}(x)$. By linearity,
+\begin{equation}
+  \sum_{i=1}^{K}c^{(\ell)}_i(x)\,B_iA_i=\sum_{k=1}^{K}\alpha_k(x)\,\Delta W_k^{(\ell,u)},
+\end{equation}
+which is the thesis's weight-level merge (thesis Eq.~4.10) applied to effective adapters. With $C=I$ CGR reduces
+to thesis GMM-Router Round-1.
+
+\role Delivers transfer at the same cost as the thesis's merging: one coefficient computation per query and one
+forward pass per decoding step.
+\emph{Forward transfer} enters through the routed task's row of $C$.
+\emph{Backward transfer} enters only through routing: $c_j(x)=\sum_k\alpha_k(x)C_{kj}$ collects weight from later
+tasks that reuse atom $j$, so an old-task query with some posterior mass on a later related task receives that
+task's added knowledge. Changing an old task's own composition would require its data, which Invariant~I4 forbids.
+
+\impl
+\begin{itemize}[leftmargin=*]
+  \item The public API \MUST\ be \texttt{predict(prompts, n\_samples)} with no other per-query inputs (Invariant~I1).
+  \item All $n$ samples of a query share the same $c(x)$; no candidate is dropped, re-ranked or regenerated (I2).
+  \item Decoding\tagthesis: CodeTask --- temperature 0.2, top-$p$ 0.95, at most 512 new tokens;
+        executable --- $n=5$ samples, at most 2048 new tokens, temperature 0.2 and top-$p$ 0.95\tagassumed.
+  \item Log $\alpha(x)$ and $\hat k(x)$ for every query (needed for routing diagnostics).
+\end{itemize}
+
+% =====================================================================
+\section{Algorithms}
+% =====================================================================
+
+\begin{algorithm}[h]
+\caption{\textsc{FitTaskGMM}: diagonal EM and within-task scatter (thesis Algorithm~1 plus scatter)}\label{alg:em}
+\begin{algorithmic}[1]
+\Require embeddings $Z_k=\{z_i\}_{i=1}^{N_k}$; $M$, $T_{\max}$, $\delta$, $\sigma^2_{\min}$, seed
+\State $\pi_m\gets 1/M$; $\mu_m\gets$ distinct samples of $Z_k$; $\sigma^2_m\gets\max(\mathrm{var}(Z_k),\sigma^2_{\min})$
+\State $\mathcal{L}^{(0)}\gets-\infty$
+\For{$t=1,\dots,T_{\max}$}
+  \State E-step: $\log r_{im}\gets\log\pi_m+\log\mathcal N(z_i;\mu_m,\mathrm{diag}\,\sigma^2_m)-\operatorname{logsumexp}_{m'}[\cdot]$
+  \State M-step: $N_m\gets\sum_i r_{im}$; update $\pi_m,\mu_m,\sigma^2_m$ (variance floored at $\sigma^2_{\min}$)
+  \State $\mathcal{L}^{(t)}\gets\frac{1}{N_k}\sum_i\log p(z_i)$; \textbf{if} $|\mathcal{L}^{(t)}-\mathcal{L}^{(t-1)}|<\delta$ \textbf{break}
+\EndFor
+\State Final E-step to obtain $r_{im}$
+\State $S_k\gets\sum_i\sum_m r_{im}(z_i-\mu_m)(z_i-\mu_m)\T$ \Comment{float64}
+\State \Return $(\pi,\mu,\sigma^2)$, $S_k$, $N_k$
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[h]
+\caption{\textsc{LearnTask}$(k, D_k)$}\label{alg:learn}
+\begin{algorithmic}[1]
+\Require persistent state (Section~\ref{sec:state}); training data $D_k$ of the current task only
+\State Split $D_k$ into $D_k^{\mathrm{tr}}$ and held-out $H_k$ (5\%, $\le 500$, fixed seed)
+\State $Z_k\gets\{z(x): x\in\text{sample}_{\le N_{\max}}(D_k^{\mathrm{tr}})\}$ \Comment{adapters disabled}
+\If{$k\ge2$}
+  \State $a_k\gets$ affinity of $Z_k$ to tasks $1..k-1$ (router state \emph{before} registering $k$)
+  \State $\beta^{(\ell)}_{k,1:k-1}\gets\sum_{i<k}a_{ki}\,C^{(\ell)}_{i,1:k-1}$ for all $\ell\in\Ladapt$
+\EndIf
+\State $(\pi_k,\mu_k,\sigma^2_k),S_k,N_k\gets$ \Call{FitTaskGMM}{$Z_k$}
+\State Register GMM $k$; $S\gets S+S_k$; $n\gets n+N_k$; recompute all Cholesky factors
+\If{$k\ge2$} calibrate $\tau_k$ on $H_k$ and update $\tau$ \EndIf
+\State Add atom $k$ ($A_k$ Kaiming-uniform, $B_k=0$); freeze atoms $1..k-1$
+\If{$k\ge2$} \textbf{Phase A}: train $\beta_k$ only on $\mathcal L_k$ for $S_A$ steps ($B_k$ held at 0) \EndIf
+\State \textbf{Phase B}: train $(A_k,B_k)$ and $\beta_k$ on $\mathcal L_k$ for 3 epochs
+\State Freeze atom $k$, row $k$ of all $C^{(\ell)}$, GMM $k$; write checkpoint and hashes
+\State Discard $D_k$, $Z_k$, $H_k$ \Comment{Invariant I4}
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[h]
+\caption{\textsc{Predict}$(x, n)$ --- the only inference entry point}\label{alg:predict}
+\begin{algorithmic}[1]
+\Require prompt string $x$; number of samples $n$ \Comment{no task metadata (I1)}
+\State $z\gets z(x)$; compute $s_k(z)$ for $k=1..K$ (Eq.~\ref{eq:score})
+\State $\alpha\gets e_{\hat k}$ (hard) or $\mathrm{softmax}(s/\tau)$ (soft)
+\State $c^{(\ell)}\gets C^{(\ell)\T}\alpha$ for all $\ell\in\Ladapt$; set atom-bank coefficients
+\State Generate $n$ samples in one round \Comment{no execution, no second round (I2, I3)}
+\State \Return samples, $\alpha$, $\hat k$
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[h]
+\caption{\textsc{RunSequence}$(T_1,\dots,T_K)$}\label{alg:run}
+\begin{algorithmic}[1]
+\State Initialise backbone (frozen), $P$ (seed $s_P$), $S\gets0$, $n\gets0$, empty registries
+\For{$k=1,\dots,K$}
+  \State \Call{LearnTask}{$k, D_k$}
+  \LineComment{Evaluation only: read-only access to test sets of tasks $1..k$}
+  \For{$j=1,\dots,k$}
+     \State generate with \Call{Predict}{} for all test prompts of $T_j$; write to disk
+     \State score with the evaluation harness $\rightarrow a_{k,j}$; record hard-routing confusion row
+  \EndFor
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+\clearpage
+% =====================================================================
+\section{Hyperparameters}\label{sec:hparams}
+% =====================================================================
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}l X l l@{}}
+\toprule
+Symbol & Meaning & Default & Source\\
+\midrule
+--- & Backbone & Qwen2.5-Coder-1.5B & thesis\\
+$\ell^*$ & Routing/split block & 4 & thesis\\
+$p$ & Routing dimension & 256 & thesis\\
+$s_P$ & Projection seed & 0 & new\\
+--- & Max prompt length (routing), truncation side & 2048, right & thesis\\
+$M$ & GMM components per task & 4 & thesis\\
+$T_{\max}$, $\delta$ & EM iterations, tolerance & 50, $10^{-4}$ & thesis\\
+$\sigma^2_{\min}$ & Variance floor & 0.02 & thesis\\
+$N_{\max}$ & Embeddings per task for GMM & 5000 & thesis\\
+$\lambda$ & Covariance shrinkage & 1.0 (sweep 0, .25, .5, .75, 1) & new\\
+$\epsilon_\Sigma$ & Covariance jitter & $10^{-4}$ & new\\
+$\tau_{\mathrm{aff}}$ & Temperature for affinity & 1.0 & new\\
+$\tau$ & Routing temperature & calibrated on $H_k$, grid $2^{-2}..2^{8}$ & new\\
+$|H_k|$ & Held-out slice for calibration & 5\% of $D_k$, $\le 500$ & new\\
+$r$, \texttt{lora\_alpha}, dropout & LoRA atom & 16, 32, 0.1 & thesis\\
+--- & Target modules, blocks & \texttt{q\_proj}, \texttt{v\_proj}; $\ell^*..L-1$ & thesis\\
+$S_A$, $\eta_A$ & Phase A steps, LR ($\beta$ only) & 300, $5\times10^{-3}$ & new\\
+--- & Phase B epochs, batch, LR, warmup, WD (atom) & 3, 32, $10^{-4}$, 0.01, 0.01 & thesis\\
+$\eta_\beta$ & Phase B LR for $\beta$ & $2\times10^{-5}$ & new\\
+--- & Max train / val / test examples per task & 100k / 2k / 5k & thesis\\
+--- & CodeTask decoding & $T{=}0.2$, top-$p$ 0.95, 512 tokens, hard routing & thesis\\
+--- & Executable decoding & $n{=}5$, 2048 tokens; $T{=}0.2$, top-$p$ 0.95 & thesis / assumed\\
+--- & Precision & bf16 backbone, fp32 atoms/$\beta$, fp64 router & new\\
+\bottomrule
+\end{tabularx}
+\caption{Hyperparameters. Every run \MUST\ save the full resolved configuration with its checkpoints.}
+\end{table}
+
+% =====================================================================
+\section{Software architecture}\label{sec:software}
+% =====================================================================
+
+The following layout and signatures are recommended (\SHOULD). Names may change; responsibilities and the
+inference signature may not.
+
+\begin{lstlisting}
+cgr/
+  config.py        # CGRConfig dataclass: every value of Section 7; saved as config.json
+  data.py          # task registry; reuse thesis loaders/templates; split D_k -> (train, H_k)
+  features.py      # RoutingEncoder: P, layer l*, masked mean pool, parameter-free LN
+  gmm.py           # fit_diag_gmm (Algorithm 1), within_scatter
+  router.py        # Router: register, scores, weights, affinity, calibrate_tau
+  atoms.py         # AtomBankLinear, install_atom_bank, set_coefficients
+  composition.py   # Composition: per-block lower-triangular C, init_row, freeze_row
+  train.py         # learn_task (Algorithm 2): phase A, phase B
+  infer.py         # predict (Algorithm 3) -- the ONLY inference entry point
+  run_sequence.py  # Algorithm 4: loop over tasks, checkpoints, evaluation schedule
+  eval/            # reuse thesis BLEU/CodeBLEU/Pass@k harness; cl_metrics.py
+  tests/           # acceptance tests T1-T10 (Section 10)
+\end{lstlisting}
+
+\begin{lstlisting}
+class RoutingEncoder:
+    def embed(self, prompts: list[str]) -> np.ndarray: ...       # [B, p], adapters disabled
+
+def fit_diag_gmm(Z: np.ndarray, M: int, t_max: int, tol: float,
+                 var_floor: float, seed: int) -> tuple["DiagGMM", np.ndarray]: ...  # (gmm, resp)
+def within_scatter(Z: np.ndarray, gmm: "DiagGMM", resp: np.ndarray) -> np.ndarray: ...  # [p, p]
+
+class Router:
+    def register(self, gmm: "DiagGMM", scatter: np.ndarray, n_k: int) -> None: ...
+    def scores(self, Z: np.ndarray) -> np.ndarray: ...            # [B, K], Eq. (score)
+    def weights(self, Z: np.ndarray, hard: bool) -> np.ndarray: ...  # [B, K]
+    def affinity(self, Z_new: np.ndarray) -> np.ndarray: ...      # [K_prev], before register()
+    def calibrate_tau(self, Z_heldout: np.ndarray, k: int) -> float: ...
+
+class AtomBank:
+    def add_atom(self) -> int: ...
+    def freeze_atom(self, i: int) -> None: ...
+    def set_coefficients(self, c: torch.Tensor) -> None: ...      # [B, n_blocks, K]
+
+class Composition:
+    def init_row(self, k: int, affinity: np.ndarray) -> None: ...
+    def trainable_row(self, k: int) -> torch.nn.Parameter: ...    # [n_blocks, k-1]
+    def freeze_row(self, k: int) -> None: ...
+    def coefficients(self, alpha: torch.Tensor) -> torch.Tensor: ...  # C^T alpha -> [B, n_blocks, K]
+
+def learn_task(k: int, task_data, state, cfg) -> None: ...
+def predict(prompts: list[str], n_samples: int, state, cfg) -> list["Prediction"]: ...
+    # MUST NOT accept task ids, languages, tests or any other metadata
+\end{lstlisting}
+
+\paragraph{Checkpoint layout.} After each task:
+\begin{lstlisting}
+state/
+  config.json
+  projection_P.npy
+  router/gmm_{k}.npz          # pi [M], mu [M,p], var [M,p]
+  router/scatter.npz          # S [p,p], n, S_k for every k
+  router/tau.json             # tau_k for every k and the running tau
+  atoms/atom_{k}.safetensors  # A_k, B_k for every (block, module)
+  composition/beta_{k}.npy    # [n_blocks, k-1]
+  manifest.json               # sha256 of every frozen artifact (test T7)
+\end{lstlisting}
+
+% =====================================================================
+\section{Evaluation protocol}\label{sec:eval}
+% =====================================================================
+
+\paragraph{Task sequences\tagthesis.} CodeTask: CONCODE, CodeTrans, CodeSearchNet, BFP, KodCode, RunBugRun,
+TheVault, CoST. Executable: Python, C++, C\#, Java, Rust, Swift, PHP, TypeScript, Shell.
+
+\paragraph{Per-task metrics\tagthesis.} CodeTask: BLEU for text-output tasks (CodeSearchNet, TheVault) and
+CodeBLEU for code-output tasks, as in the thesis evaluation code\tagassumed. Executable: Pass@1 and Pass@5 with the
+unbiased estimator $\mathrm{Pass}@k=1-\binom{n-c}{k}/\binom{n}{k}$, $n=5$.
+
+\paragraph{Continual-learning metrics\tagthesis.} With $a_{i,j}$ the score on task $j$ after training tasks
+$1..i$:
+\begin{gather}
+  \mathrm{FM}_K=\frac{1}{K-1}\sum_{j=1}^{K-1}\max_{i<K}(a_{i,j}-a_{K,j}),\qquad
+  \mathrm{BWT}_K=\frac{1}{K-1}\sum_{j=1}^{K-1}(a_{K,j}-a_{j,j}),\\
+  \mathrm{FWT}_K=\frac{1}{K-1}\sum_{j=2}^{K}(a_{j,j}-\tilde a_j).
+\end{gather}
+$\tilde a_j$ \MUST\ match the reference used in the thesis code\tagassumed. In addition, report the transfer gain
+attributable to composition, $\Delta_j=a_{j,j}^{\mathrm{CGR}}-a_{j,j}^{C=I}$, and the Phase-A-only score of each
+task (pure reuse).
+
+\paragraph{Routing diagnostics.} Row-normalised hard-routing confusion matrices after the final task and after
+each task; per-task routing accuracy over the sequence (to measure routing drift caused by updates of $\bar\Sigma$);
+mean entropy of $\alpha(x)$; the learned $\beta$ matrices averaged over blocks.
+
+\paragraph{Reference numbers (thesis, Qwen2.5-Coder-1.5B).} The leak-free GMM-Router baseline on the executable
+benchmark is \emph{Round-1 only}.
+\begin{center}
+\small
+\begin{tabular}{@{}lccc@{}}
+\toprule
+Method & CodeTask avg (\%) & Exec Pass@1 (\%) & Exec Pass@5 (\%)\\
+\midrule
+GMM-Router, leak-free (Round-1 only) & 51.62 & 33.04 & 41.66\\
+GMM-Router + Round-2 (leaky, not a baseline) & --- & 34.40 & 47.75\\
+LoRA per task (oracle task identity) & 54.15 & 33.46 & 42.19\\
+SeqLoRA & 34.90 & 37.51 & 45.67\\
+TreeLoRA & 34.58 & 36.84 & 46.37\\
+O-LoRA & 42.77 & 33.71 & 42.09\\
+\bottomrule
+\end{tabular}
+\end{center}
+Hard-routing accuracy of the thesis router: 90.6\% (CodeTask), 15.8\% (executable).
+
+\subsection{Ablation grid}\label{sec:ablations}
+\begin{center}
+\small
+\begin{tabular}{@{}llll@{}}
+\toprule
+ID & Composition & $\lambda$ & Purpose\\
+\midrule
+A0 & $C=I$ & 0 & Reproduce thesis Round-1 (sanity check)\\
+A1 & $C=I$ & 1 & Routing only\\
+A2 & learned & 0 & Transfer only\\
+A3 & learned & 1 & Full CGR\\
+A4 & learned & 0.25, 0.5, 0.75 & Shrinkage sweep\\
+A5 & Phase A only (atom $k$ never trained) & 1 & Pure reuse of earlier knowledge\\
+A6 & learned, no Phase A & 1 & Value of compose-first training\\
+A7 & learned, $\beta$ initialised at 0 & 1 & Value of the router prior\\
+A8 & learned, oracle routing $\alpha=e_{\text{true}}$ & --- & Composition upper bound (analysis only)\\
+A9 & full CGR, fixed $\tau\in\mathcal T$ & 1 & Temperature sensitivity (analysis only)\\
+\bottomrule
+\end{tabular}
+\end{center}
+A8 and A9 use test-set information and \MUSTNOT\ be presented as methods. Report at least 3 seeds for A0--A3;
+on the executable benchmark one problem is 2 points of a language's Pass@1 (50 problems per language), so report
+bootstrap confidence intervals over problems.
+
+% =====================================================================
+\section{Acceptance tests}\label{sec:tests}
+% =====================================================================
+
+\begin{enumerate}[label=T\arabic*., leftmargin=*]
+  \item \textbf{Adapter-independent features.} With random non-zero atoms and coefficients installed, $z(x)$ read
+        from the full model equals $z(x)$ computed with adapters disabled (max abs diff $<10^{-4}$, fp32).
+  \item \textbf{EM reproduction.} On synthetic data from a known diagonal GMM, the fitted means are recovered
+        (up to permutation) and the log-likelihood is non-decreasing across iterations.
+  \item \textbf{Scatter correctness.} With $M=1$ on synthetic labelled data, $S/n$ equals the directly computed
+        pooled within-class covariance (relative tolerance $10^{-6}$).
+  \item \textbf{Thesis router equivalence.} With $\lambda=0$, \texttt{Router.scores} equals the diagonal-GMM
+        log-likelihood plus $\log(1/K)$ computed independently (thesis Eq.~4.6), to $10^{-8}$.
+  \item \textbf{Merge equivalence.} For random $\alpha$ and lower-triangular $C$, the atom-bank output with
+        $c=C\T\alpha$ equals $Wx+\kappa\sum_k\alpha_k\Delta W_k x$ computed from explicitly merged matrices
+        (relative tolerance $10^{-4}$). With $C=I$ this equals thesis Eq.~4.10.
+  \item \textbf{Phase continuity.} In eval mode (dropout off), the held-out loss at Phase~B step~0 equals the
+        Phase~A final held-out loss (difference $<10^{-5}$).
+  \item \textbf{Freeze integrity.} After \textsc{LearnTask}$(k)$, the sha256 hashes of atoms $1..k-1$, rows
+        $2..k-1$ of every $C^{(\ell)}$, GMMs $1..k-1$ and $P$ are unchanged.
+  \item \textbf{Leakage guard.} \texttt{predict} has no parameter other than prompts and $n$; a static check
+        confirms that no module under \texttt{cgr/} other than \texttt{eval/} imports \texttt{subprocess},
+        the execution harness or test-case loaders; the evaluation harness runs only on files written after
+        generation has finished.
+  \item \textbf{No-replay guard.} The data registry refuses to construct a loader for task $j<k$ while training
+        task $k$; only evaluation code may open earlier test splits, in read-only mode.
+  \item \textbf{Determinism.} With fixed seeds and greedy decoding, two runs produce identical $\alpha$, $\beta$
+        and generations.
+\end{enumerate}
+
+% =====================================================================
+\section{Known risks and points to verify}\label{sec:risks}
+% =====================================================================
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Routing drift from $\bar\Sigma$ updates.} Registering a task changes $\bar\Sigma$ and therefore
+        earlier tasks' scores. Monitor per-task routing accuracy after every task; a variant that freezes
+        $\bar\Sigma$ after the first three tasks \MAY\ be added if drift is large.
+  \item \textbf{Input similarity is not output compatibility.} The affinity prior can point to unhelpful atoms;
+        Phase~A is responsible for correcting it. Compare Phase-A loss with the loss of a fresh LoRA after the same
+        number of steps to detect negative transfer.
+  \item \textbf{First task.} Task 1 receives no forward transfer by construction.
+  \item \textbf{Temperature scale.} If calibrated $\tau$ values differ by more than an order of magnitude across
+        tasks, report them and the A9 sensitivity.
+  \item \textbf{Points to verify against the thesis code} (all tagged \tagassumed): hidden-state index convention
+        for $\ell^*$; executable sampling temperature and top-$p$; the reference $\tilde a_j$ used for FWT; the
+        exact BLEU/CodeBLEU assignment per CodeTask task.
+\end{itemize}
+
+\paragraph{Related work to position against.} Progressive Neural Networks (lateral connections to frozen
+columns), LoraHub (composition of frozen LoRA modules) and MoCL (rehearsal-free composition of task modules for
+language models). CGR differs in that task identification (GMM routing over tasks) and knowledge composition
+(the learned matrix $C$) are learned separately and meet only in $c(x)=C\T\alpha(x)$.
+
+\end{document}

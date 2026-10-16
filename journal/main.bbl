@@ -1,0 +1,638 @@
+\begin{thebibliography}{67}
+\expandafter\ifx\csname natexlab\endcsname\relax\def\natexlab#1{#1}\fi
+\providecommand{\url}[1]{\texttt{#1}}
+\providecommand{\href}[2]{#2}
+\providecommand{\path}[1]{#1}
+\providecommand{\DOIprefix}{doi:}
+\providecommand{\ArXivprefix}{arXiv:}
+\providecommand{\URLprefix}{URL: }
+\providecommand{\Pubmedprefix}{pmid:}
+\providecommand{\doi}[1]{\href{http://dx.doi.org/#1}{\path{#1}}}
+\providecommand{\Pubmed}[1]{\href{pmid:#1}{\path{#1}}}
+\providecommand{\bibinfo}[2]{#2}
+\ifx\xfnm\relax \def\xfnm[#1]{\unskip,\space#1}\fi
+%Type = Inproceedings
+\bibitem[{Ahmad et~al.(2021)Ahmad, Chakraborty, Ray and
+  Chang}]{ahmad2021plbart}
+\bibinfo{author}{Ahmad, W.U.}, \bibinfo{author}{Chakraborty, S.},
+  \bibinfo{author}{Ray, B.}, \bibinfo{author}{Chang, K.W.},
+  \bibinfo{year}{2021}.
+\newblock \bibinfo{title}{Unified pre-training for program understanding and
+  generation}, in: \bibinfo{booktitle}{Proceedings of the 2021 Conference of
+  the North American Chapter of the Association for Computational Linguistics},
+  pp. \bibinfo{pages}{2655--2668}.
+%Type = Inproceedings
+\bibitem[{Aljundi et~al.(2018)Aljundi, Babiloni, Elhoseiny, Rohrbach and
+  Tuytelaars}]{aljundi2018memory}
+\bibinfo{author}{Aljundi, R.}, \bibinfo{author}{Babiloni, F.},
+  \bibinfo{author}{Elhoseiny, M.}, \bibinfo{author}{Rohrbach, M.},
+  \bibinfo{author}{Tuytelaars, T.}, \bibinfo{year}{2018}.
+\newblock \bibinfo{title}{Memory aware synapses: Learning what (not) to
+  forget}, in: \bibinfo{booktitle}{European Conference on Computer Vision}, pp.
+  \bibinfo{pages}{144--161}.
+%Type = Article
+\bibitem[{Austin et~al.(2021)Austin, Odena, Nye, Bosma, Michalewski, Dohan,
+  Jiang, Cai, Terry, Le et~al.}]{austin2021program}
+\bibinfo{author}{Austin, J.}, \bibinfo{author}{Odena, A.},
+  \bibinfo{author}{Nye, M.}, \bibinfo{author}{Bosma, M.},
+  \bibinfo{author}{Michalewski, H.}, \bibinfo{author}{Dohan, D.},
+  \bibinfo{author}{Jiang, E.}, \bibinfo{author}{Cai, C.},
+  \bibinfo{author}{Terry, M.}, \bibinfo{author}{Le, Q.}, et~al.,
+  \bibinfo{year}{2021}.
+\newblock \bibinfo{title}{Program synthesis with large language models}.
+\newblock \bibinfo{journal}{arXiv preprint arXiv:2108.07732} .
+%Type = Book
+\bibitem[{Bishop(2006)}]{bishop2006pattern}
+\bibinfo{author}{Bishop, C.M.}, \bibinfo{year}{2006}.
+\newblock \bibinfo{title}{Pattern Recognition and Machine Learning}.
+\newblock \bibinfo{publisher}{Springer}.
+%Type = Inproceedings
+\bibitem[{Broder(1997)}]{broder1997resemblance}
+\bibinfo{author}{Broder, A.Z.}, \bibinfo{year}{1997}.
+\newblock \bibinfo{title}{On the resemblance and containment of documents}, in:
+  \bibinfo{booktitle}{Proceedings of Compression and Complexity of Sequences},
+  pp. \bibinfo{pages}{21--29}.
+%Type = Inproceedings
+\bibitem[{Buzzega et~al.(2020)Buzzega, Boschini, Porrello, Abati and
+  Calderara}]{buzzega2020dark}
+\bibinfo{author}{Buzzega, P.}, \bibinfo{author}{Boschini, M.},
+  \bibinfo{author}{Porrello, A.}, \bibinfo{author}{Abati, D.},
+  \bibinfo{author}{Calderara, S.}, \bibinfo{year}{2020}.
+\newblock \bibinfo{title}{Dark experience for general continual learning: A
+  strong, simple baseline}, in: \bibinfo{booktitle}{Advances in Neural
+  Information Processing Systems}, pp. \bibinfo{pages}{15920--15930}.
+%Type = Article
+\bibitem[{Cassano et~al.(2023)Cassano, Gouwar, Nguyen, Nguyen, Phipps-Costin,
+  Pinckney, Yee, Zi, Anderson, Feldman et~al.}]{cassano2023multipl}
+\bibinfo{author}{Cassano, F.}, \bibinfo{author}{Gouwar, J.},
+  \bibinfo{author}{Nguyen, D.}, \bibinfo{author}{Nguyen, S.},
+  \bibinfo{author}{Phipps-Costin, L.}, \bibinfo{author}{Pinckney, D.},
+  \bibinfo{author}{Yee, M.H.}, \bibinfo{author}{Zi, Y.},
+  \bibinfo{author}{Anderson, C.J.}, \bibinfo{author}{Feldman, M.Q.}, et~al.,
+  \bibinfo{year}{2023}.
+\newblock \bibinfo{title}{Multipl-e: A scalable and polyglot approach to
+  benchmarking neural code generation}.
+\newblock \bibinfo{journal}{IEEE Transactions on Software Engineering}
+  \bibinfo{volume}{49}, \bibinfo{pages}{3675--3691}.
+%Type = Inproceedings
+\bibitem[{Chai et~al.(2025)Chai, Liu, Yang, Yin, Jin, Liu, Sun, Zhang, Ren,
+  Guo, Wang, Wang, Wu, Wang, Li, Yang, Duan and Li}]{chai2024mceval}
+\bibinfo{author}{Chai, L.}, \bibinfo{author}{Liu, S.}, \bibinfo{author}{Yang,
+  J.}, \bibinfo{author}{Yin, Y.}, \bibinfo{author}{Jin, K.},
+  \bibinfo{author}{Liu, J.}, \bibinfo{author}{Sun, T.}, \bibinfo{author}{Zhang,
+  G.}, \bibinfo{author}{Ren, C.}, \bibinfo{author}{Guo, H.},
+  \bibinfo{author}{Wang, Z.}, \bibinfo{author}{Wang, B.}, \bibinfo{author}{Wu,
+  X.}, \bibinfo{author}{Wang, B.}, \bibinfo{author}{Li, T.},
+  \bibinfo{author}{Yang, L.}, \bibinfo{author}{Duan, S.}, \bibinfo{author}{Li,
+  Z.}, \bibinfo{year}{2025}.
+\newblock \bibinfo{title}{Mceval: Massively multilingual code evaluation}, in:
+  \bibinfo{booktitle}{International Conference on Learning Representations}.
+%Type = Inproceedings
+\bibitem[{Chaudhry et~al.(2019)Chaudhry, Ranzato, Rohrbach and
+  Elhoseiny}]{chaudhry2019agem}
+\bibinfo{author}{Chaudhry, A.}, \bibinfo{author}{Ranzato, M.},
+  \bibinfo{author}{Rohrbach, M.}, \bibinfo{author}{Elhoseiny, M.},
+  \bibinfo{year}{2019}.
+\newblock \bibinfo{title}{Efficient lifelong learning with a-gem}, in:
+  \bibinfo{booktitle}{International Conference on Learning Representations}.
+%Type = Article
+\bibitem[{Chen et~al.(2021)Chen, Tworek, Jun, Yuan, Pinto, Kaplan, Edwards,
+  Burda, Joseph, Brockman et~al.}]{chen2021evaluating}
+\bibinfo{author}{Chen, M.}, \bibinfo{author}{Tworek, J.}, \bibinfo{author}{Jun,
+  H.}, \bibinfo{author}{Yuan, Q.}, \bibinfo{author}{Pinto, H.P.d.O.},
+  \bibinfo{author}{Kaplan, J.}, \bibinfo{author}{Edwards, H.},
+  \bibinfo{author}{Burda, Y.}, \bibinfo{author}{Joseph, N.},
+  \bibinfo{author}{Brockman, G.}, et~al., \bibinfo{year}{2021}.
+\newblock \bibinfo{title}{Evaluating large language models trained on code}.
+\newblock \bibinfo{journal}{arXiv preprint arXiv:2107.03374} .
+%Type = Inproceedings
+\bibitem[{Cheng et~al.(2025)Cheng, Ye, Xu, Yan, Zhang, Liu, Huang and
+  Feng}]{cheng2025exploiting}
+\bibinfo{author}{Cheng, X.}, \bibinfo{author}{Ye, J.}, \bibinfo{author}{Xu,
+  H.}, \bibinfo{author}{Yan, M.}, \bibinfo{author}{Zhang, J.},
+  \bibinfo{author}{Liu, F.}, \bibinfo{author}{Huang, F.},
+  \bibinfo{author}{Feng, L.}, \bibinfo{year}{2025}.
+\newblock \bibinfo{title}{Exploiting presentative feature distributions for
+  parameter-efficient continual learning of large language models}, in:
+  \bibinfo{booktitle}{International Conference on Machine Learning}.
+%Type = Article
+\bibitem[{De~Lange et~al.(2021)De~Lange, Aljundi, Masana, Parisot, Jia,
+  Leonardis, Slabaugh and Tuytelaars}]{delange2021continual}
+\bibinfo{author}{De~Lange, M.}, \bibinfo{author}{Aljundi, R.},
+  \bibinfo{author}{Masana, M.}, \bibinfo{author}{Parisot, S.},
+  \bibinfo{author}{Jia, X.}, \bibinfo{author}{Leonardis, A.},
+  \bibinfo{author}{Slabaugh, G.}, \bibinfo{author}{Tuytelaars, T.},
+  \bibinfo{year}{2021}.
+\newblock \bibinfo{title}{A continual learning survey: Defying forgetting in
+  classification tasks}.
+\newblock \bibinfo{journal}{IEEE Transactions on Pattern Analysis and Machine
+  Intelligence} \bibinfo{volume}{44}, \bibinfo{pages}{3366--3385}.
+%Type = Article
+\bibitem[{Dempster et~al.(1977)Dempster, Laird and Rubin}]{dempster1977maximum}
+\bibinfo{author}{Dempster, A.P.}, \bibinfo{author}{Laird, N.M.},
+  \bibinfo{author}{Rubin, D.B.}, \bibinfo{year}{1977}.
+\newblock \bibinfo{title}{Maximum likelihood from incomplete data via the em
+  algorithm}.
+\newblock \bibinfo{journal}{Journal of the Royal Statistical Society: Series B}
+  \bibinfo{volume}{39}, \bibinfo{pages}{1--38}.
+%Type = Article
+\bibitem[{Fedus et~al.(2022)Fedus, Zoph and Shazeer}]{fedus2022switch}
+\bibinfo{author}{Fedus, W.}, \bibinfo{author}{Zoph, B.},
+  \bibinfo{author}{Shazeer, N.}, \bibinfo{year}{2022}.
+\newblock \bibinfo{title}{Switch transformers: Scaling to trillion parameter
+  models with simple and efficient sparsity}.
+\newblock \bibinfo{journal}{Journal of Machine Learning Research}
+  \bibinfo{volume}{23}, \bibinfo{pages}{1--39}.
+%Type = Inproceedings
+\bibitem[{Feng et~al.(2020)Feng, Guo, Tang, Duan, Feng, Gong, Shou, Qin, Liu,
+  Jiang and Zhou}]{feng2020codebert}
+\bibinfo{author}{Feng, Z.}, \bibinfo{author}{Guo, D.}, \bibinfo{author}{Tang,
+  D.}, \bibinfo{author}{Duan, N.}, \bibinfo{author}{Feng, X.},
+  \bibinfo{author}{Gong, M.}, \bibinfo{author}{Shou, L.}, \bibinfo{author}{Qin,
+  B.}, \bibinfo{author}{Liu, T.}, \bibinfo{author}{Jiang, D.},
+  \bibinfo{author}{Zhou, M.}, \bibinfo{year}{2020}.
+\newblock \bibinfo{title}{Codebert: A pre-trained model for programming and
+  natural languages}, in: \bibinfo{booktitle}{Findings of the Association for
+  Computational Linguistics: EMNLP 2020}, pp. \bibinfo{pages}{1536--1547}.
+%Type = Inproceedings
+\bibitem[{Fried et~al.(2023)Fried, Aghajanyan, Lin, Wang, Wallace, Shi, Zhong,
+  Yih, Zettlemoyer and Lewis}]{fried2023incoder}
+\bibinfo{author}{Fried, D.}, \bibinfo{author}{Aghajanyan, A.},
+  \bibinfo{author}{Lin, J.}, \bibinfo{author}{Wang, S.},
+  \bibinfo{author}{Wallace, E.}, \bibinfo{author}{Shi, F.},
+  \bibinfo{author}{Zhong, R.}, \bibinfo{author}{Yih, W.t.},
+  \bibinfo{author}{Zettlemoyer, L.}, \bibinfo{author}{Lewis, M.},
+  \bibinfo{year}{2023}.
+\newblock \bibinfo{title}{Incoder: A generative model for code infilling and
+  synthesis}, in: \bibinfo{booktitle}{International Conference on Learning
+  Representations}.
+%Type = Article
+\bibitem[{Goodfellow et~al.(2013)Goodfellow, Mirza, Xiao, Courville and
+  Bengio}]{goodfellow2013empirical}
+\bibinfo{author}{Goodfellow, I.J.}, \bibinfo{author}{Mirza, M.},
+  \bibinfo{author}{Xiao, D.}, \bibinfo{author}{Courville, A.},
+  \bibinfo{author}{Bengio, Y.}, \bibinfo{year}{2013}.
+\newblock \bibinfo{title}{An empirical investigation of catastrophic forgetting
+  in gradient-based neural networks}.
+\newblock \bibinfo{journal}{arXiv preprint arXiv:1312.6211} .
+%Type = Inproceedings
+\bibitem[{Guo et~al.(2022)Guo, Lu, Duan, Wang, Zhou and Yin}]{guo2022unixcoder}
+\bibinfo{author}{Guo, D.}, \bibinfo{author}{Lu, S.}, \bibinfo{author}{Duan,
+  N.}, \bibinfo{author}{Wang, Y.}, \bibinfo{author}{Zhou, M.},
+  \bibinfo{author}{Yin, J.}, \bibinfo{year}{2022}.
+\newblock \bibinfo{title}{Unixcoder: Unified cross-modal pre-training for code
+  representation}, in: \bibinfo{booktitle}{Proceedings of the 60th Annual
+  Meeting of the Association for Computational Linguistics}, pp.
+  \bibinfo{pages}{7212--7225}.
+%Type = Inproceedings
+\bibitem[{Guo et~al.(2021)Guo, Ren, Lu, Feng, Tang, Liu, Zhou, Duan,
+  Svyatkovskiy, Fu et~al.}]{guo2021graphcodebert}
+\bibinfo{author}{Guo, D.}, \bibinfo{author}{Ren, S.}, \bibinfo{author}{Lu, S.},
+  \bibinfo{author}{Feng, Z.}, \bibinfo{author}{Tang, D.}, \bibinfo{author}{Liu,
+  S.}, \bibinfo{author}{Zhou, L.}, \bibinfo{author}{Duan, N.},
+  \bibinfo{author}{Svyatkovskiy, A.}, \bibinfo{author}{Fu, S.}, et~al.,
+  \bibinfo{year}{2021}.
+\newblock \bibinfo{title}{Graphcodebert: Pre-training code representations with
+  data flow}, in: \bibinfo{booktitle}{International Conference on Learning
+  Representations}.
+%Type = Inproceedings
+\bibitem[{He et~al.(2025)He, Duan and Zhu}]{he2025cllora}
+\bibinfo{author}{He, J.}, \bibinfo{author}{Duan, Z.}, \bibinfo{author}{Zhu,
+  F.}, \bibinfo{year}{2025}.
+\newblock \bibinfo{title}{Cl-lora: Continual low-rank adaptation for
+  rehearsal-free class-incremental learning}, in:
+  \bibinfo{booktitle}{Proceedings of the IEEE/CVF Conference on Computer Vision
+  and Pattern Recognition}.
+%Type = Inproceedings
+\bibitem[{Houlsby et~al.(2019)Houlsby, Giurgiu, Jastrzebski, Morrone,
+  De~Laroussilhe, Gesmundo, Attariyan and Gelly}]{houlsby2019parameter}
+\bibinfo{author}{Houlsby, N.}, \bibinfo{author}{Giurgiu, A.},
+  \bibinfo{author}{Jastrzebski, S.}, \bibinfo{author}{Morrone, B.},
+  \bibinfo{author}{De~Laroussilhe, Q.}, \bibinfo{author}{Gesmundo, A.},
+  \bibinfo{author}{Attariyan, M.}, \bibinfo{author}{Gelly, S.},
+  \bibinfo{year}{2019}.
+\newblock \bibinfo{title}{Parameter-efficient transfer learning for nlp}, in:
+  \bibinfo{booktitle}{International Conference on Machine Learning}, pp.
+  \bibinfo{pages}{2790--2799}.
+%Type = Inproceedings
+\bibitem[{Hu et~al.(2022)Hu, Shen, Wallis, Allen-Zhu, Li, Wang, Wang and
+  Chen}]{hu2022lora}
+\bibinfo{author}{Hu, E.J.}, \bibinfo{author}{Shen, Y.},
+  \bibinfo{author}{Wallis, P.}, \bibinfo{author}{Allen-Zhu, Z.},
+  \bibinfo{author}{Li, Y.}, \bibinfo{author}{Wang, S.}, \bibinfo{author}{Wang,
+  L.}, \bibinfo{author}{Chen, W.}, \bibinfo{year}{2022}.
+\newblock \bibinfo{title}{Lora: Low-rank adaptation of large language models},
+  in: \bibinfo{booktitle}{International Conference on Learning
+  Representations}.
+%Type = Article
+\bibitem[{Hui et~al.(2024)Hui, Yang, Cui, Yang, Liu, Zhang, Liu, Zhang, Yu, Lu
+  et~al.}]{hui2024qwen25coder}
+\bibinfo{author}{Hui, B.}, \bibinfo{author}{Yang, J.}, \bibinfo{author}{Cui,
+  Z.}, \bibinfo{author}{Yang, J.}, \bibinfo{author}{Liu, D.},
+  \bibinfo{author}{Zhang, L.}, \bibinfo{author}{Liu, T.},
+  \bibinfo{author}{Zhang, J.}, \bibinfo{author}{Yu, B.}, \bibinfo{author}{Lu,
+  K.}, et~al., \bibinfo{year}{2024}.
+\newblock \bibinfo{title}{Qwen2.5-coder technical report}.
+\newblock \bibinfo{journal}{arXiv preprint arXiv:2409.12186} .
+%Type = Article
+\bibitem[{Husain et~al.(2019)Husain, Wu, Gazit, Allamanis and
+  Brockschmidt}]{husain2019codesearchnet}
+\bibinfo{author}{Husain, H.}, \bibinfo{author}{Wu, H.H.},
+  \bibinfo{author}{Gazit, T.}, \bibinfo{author}{Allamanis, M.},
+  \bibinfo{author}{Brockschmidt, M.}, \bibinfo{year}{2019}.
+\newblock \bibinfo{title}{Codesearchnet challenge: Evaluating the state of
+  semantic code search}.
+\newblock \bibinfo{journal}{arXiv preprint arXiv:1909.09436} .
+%Type = Inproceedings
+\bibitem[{Indyk and Motwani(1998)}]{indyk1998approximate}
+\bibinfo{author}{Indyk, P.}, \bibinfo{author}{Motwani, R.},
+  \bibinfo{year}{1998}.
+\newblock \bibinfo{title}{Approximate nearest neighbors: Towards removing the
+  curse of dimensionality}, in: \bibinfo{booktitle}{Proceedings of the
+  Thirtieth Annual ACM Symposium on Theory of Computing}, pp.
+  \bibinfo{pages}{604--613}.
+%Type = Inproceedings
+\bibitem[{Iyer et~al.(2018)Iyer, Konstas, Cheung and
+  Zettlemoyer}]{iyer2018mapping}
+\bibinfo{author}{Iyer, S.}, \bibinfo{author}{Konstas, I.},
+  \bibinfo{author}{Cheung, A.}, \bibinfo{author}{Zettlemoyer, L.},
+  \bibinfo{year}{2018}.
+\newblock \bibinfo{title}{Mapping language to code in programmatic context},
+  in: \bibinfo{booktitle}{Proceedings of the 2018 Conference on Empirical
+  Methods in Natural Language Processing}, pp. \bibinfo{pages}{1643--1652}.
+%Type = Article
+\bibitem[{Jaccard(1901)}]{jaccard1901distribution}
+\bibinfo{author}{Jaccard, P.}, \bibinfo{year}{1901}.
+\newblock \bibinfo{title}{{'E}tude comparative de la distribution florale dans
+  une portion des alpes et du jura}.
+\newblock \bibinfo{journal}{Bulletin de la Soci{'e}t{'e} Vaudoise des Sciences
+  Naturelles} \bibinfo{volume}{37}, \bibinfo{pages}{547--579}.
+%Type = Article
+\bibitem[{Jacobs et~al.(1991)Jacobs, Jordan, Nowlan and
+  Hinton}]{jacobs1991adaptive}
+\bibinfo{author}{Jacobs, R.A.}, \bibinfo{author}{Jordan, M.I.},
+  \bibinfo{author}{Nowlan, S.J.}, \bibinfo{author}{Hinton, G.E.},
+  \bibinfo{year}{1991}.
+\newblock \bibinfo{title}{Adaptive mixtures of local experts}.
+\newblock \bibinfo{journal}{Neural Computation} \bibinfo{volume}{3},
+  \bibinfo{pages}{79--87}.
+%Type = Article
+\bibitem[{Jordan and Jacobs(1994)}]{jordan1994hierarchical}
+\bibinfo{author}{Jordan, M.I.}, \bibinfo{author}{Jacobs, R.A.},
+  \bibinfo{year}{1994}.
+\newblock \bibinfo{title}{Hierarchical mixtures of experts and the em
+  algorithm}.
+\newblock \bibinfo{journal}{Neural Computation} \bibinfo{volume}{6},
+  \bibinfo{pages}{181--214}.
+%Type = Article
+\bibitem[{Kirkpatrick et~al.(2017)Kirkpatrick, Pascanu, Rabinowitz, Veness,
+  Desjardins, Rusu, Milan, Quan, Ramalho, Grabska-Barwinska
+  et~al.}]{kirkpatrick2017overcoming}
+\bibinfo{author}{Kirkpatrick, J.}, \bibinfo{author}{Pascanu, R.},
+  \bibinfo{author}{Rabinowitz, N.}, \bibinfo{author}{Veness, J.},
+  \bibinfo{author}{Desjardins, G.}, \bibinfo{author}{Rusu, A.A.},
+  \bibinfo{author}{Milan, K.}, \bibinfo{author}{Quan, J.},
+  \bibinfo{author}{Ramalho, T.}, \bibinfo{author}{Grabska-Barwinska, A.},
+  et~al., \bibinfo{year}{2017}.
+\newblock \bibinfo{title}{Overcoming catastrophic forgetting in neural
+  networks}.
+\newblock \bibinfo{journal}{Proceedings of the National Academy of Sciences}
+  \bibinfo{volume}{114}, \bibinfo{pages}{3521--3526}.
+%Type = Article
+\bibitem[{Kullback and Leibler(1951)}]{kullback1951information}
+\bibinfo{author}{Kullback, S.}, \bibinfo{author}{Leibler, R.A.},
+  \bibinfo{year}{1951}.
+\newblock \bibinfo{title}{On information and sufficiency}.
+\newblock \bibinfo{journal}{The Annals of Mathematical Statistics}
+  \bibinfo{volume}{22}, \bibinfo{pages}{79--86}.
+%Type = Inproceedings
+\bibitem[{Lester et~al.(2021)Lester, Al-Rfou and Constant}]{lester2021power}
+\bibinfo{author}{Lester, B.}, \bibinfo{author}{Al-Rfou, R.},
+  \bibinfo{author}{Constant, N.}, \bibinfo{year}{2021}.
+\newblock \bibinfo{title}{The power of scale for parameter-efficient prompt
+  tuning}, in: \bibinfo{booktitle}{Proceedings of the 2021 Conference on
+  Empirical Methods in Natural Language Processing}, pp.
+  \bibinfo{pages}{3045--3059}.
+%Type = Article
+\bibitem[{Li and Hoiem(2017)}]{li2017learning}
+\bibinfo{author}{Li, Z.}, \bibinfo{author}{Hoiem, D.}, \bibinfo{year}{2017}.
+\newblock \bibinfo{title}{Learning without forgetting}.
+\newblock \bibinfo{journal}{IEEE Transactions on Pattern Analysis and Machine
+  Intelligence} \bibinfo{volume}{40}, \bibinfo{pages}{2935--2947}.
+%Type = Article
+\bibitem[{Lin(1991)}]{lin1991divergence}
+\bibinfo{author}{Lin, J.}, \bibinfo{year}{1991}.
+\newblock \bibinfo{title}{Divergence measures based on the shannon entropy}.
+\newblock \bibinfo{journal}{IEEE Transactions on Information Theory}
+  \bibinfo{volume}{37}, \bibinfo{pages}{145--151}.
+%Type = Inproceedings
+\bibitem[{Lopez-Paz and Ranzato(2017)}]{lopezpaz2017gem}
+\bibinfo{author}{Lopez-Paz, D.}, \bibinfo{author}{Ranzato, M.},
+  \bibinfo{year}{2017}.
+\newblock \bibinfo{title}{Gradient episodic memory for continual learning}, in:
+  \bibinfo{booktitle}{Advances in Neural Information Processing Systems}.
+%Type = Article
+\bibitem[{Lozhkov et~al.(2024)Lozhkov, Li, Ben~Allal, Cassano, Lamy-Poirier,
+  Tazi, Tang, Pykhtar, Liu, Wei et~al.}]{lozhkov2024starcoder2}
+\bibinfo{author}{Lozhkov, A.}, \bibinfo{author}{Li, R.},
+  \bibinfo{author}{Ben~Allal, L.}, \bibinfo{author}{Cassano, F.},
+  \bibinfo{author}{Lamy-Poirier, J.}, \bibinfo{author}{Tazi, N.},
+  \bibinfo{author}{Tang, A.}, \bibinfo{author}{Pykhtar, D.},
+  \bibinfo{author}{Liu, J.}, \bibinfo{author}{Wei, Y.}, et~al.,
+  \bibinfo{year}{2024}.
+\newblock \bibinfo{title}{Starcoder 2 and the stack v2: The next generation}.
+\newblock \bibinfo{journal}{arXiv preprint arXiv:2402.19173} .
+%Type = Article
+\bibitem[{Lu et~al.(2021)Lu, Guo, Ren, Huang, Svyatkovskiy, Blanco, Clement,
+  Drain, Jiang, Tang, Li, Zhou, Shou, Zhou, Tufano, Gong, Zhou, Duan,
+  Sundaresan, Deng, Fu and Liu}]{lu2021codexglue}
+\bibinfo{author}{Lu, S.}, \bibinfo{author}{Guo, D.}, \bibinfo{author}{Ren, S.},
+  \bibinfo{author}{Huang, J.}, \bibinfo{author}{Svyatkovskiy, A.},
+  \bibinfo{author}{Blanco, A.}, \bibinfo{author}{Clement, C.},
+  \bibinfo{author}{Drain, D.}, \bibinfo{author}{Jiang, D.},
+  \bibinfo{author}{Tang, D.}, \bibinfo{author}{Li, G.}, \bibinfo{author}{Zhou,
+  L.}, \bibinfo{author}{Shou, L.}, \bibinfo{author}{Zhou, L.},
+  \bibinfo{author}{Tufano, M.}, \bibinfo{author}{Gong, M.},
+  \bibinfo{author}{Zhou, M.}, \bibinfo{author}{Duan, N.},
+  \bibinfo{author}{Sundaresan, N.}, \bibinfo{author}{Deng, S.K.},
+  \bibinfo{author}{Fu, S.}, \bibinfo{author}{Liu, S.}, \bibinfo{year}{2021}.
+\newblock \bibinfo{title}{Codexglue: A machine learning benchmark dataset for
+  code understanding and generation}.
+\newblock \bibinfo{journal}{arXiv preprint arXiv:2102.04664} .
+%Type = Inproceedings
+\bibitem[{Mallya and Lazebnik(2018)}]{mallya2018packnet}
+\bibinfo{author}{Mallya, A.}, \bibinfo{author}{Lazebnik, S.},
+  \bibinfo{year}{2018}.
+\newblock \bibinfo{title}{Packnet: Adding multiple tasks to a single network by
+  iterative pruning}, in: \bibinfo{booktitle}{Proceedings of the IEEE
+  Conference on Computer Vision and Pattern Recognition}, pp.
+  \bibinfo{pages}{7765--7773}.
+%Type = Incollection
+\bibitem[{McCloskey and Cohen(1989)}]{mccloskey1989catastrophic}
+\bibinfo{author}{McCloskey, M.}, \bibinfo{author}{Cohen, N.J.},
+  \bibinfo{year}{1989}.
+\newblock \bibinfo{title}{Catastrophic interference in connectionist networks:
+  The sequential learning problem}, in: \bibinfo{booktitle}{Psychology of
+  Learning and Motivation}. \bibinfo{publisher}{Academic Press}.
+  volume~\bibinfo{volume}{24}, pp. \bibinfo{pages}{109--165}.
+%Type = Misc
+\bibitem[{{National Institute of Standards and
+  Technology}(2015)}]{nist2015securehash}
+\bibinfo{author}{{National Institute of Standards and Technology}},
+  \bibinfo{year}{2015}.
+\newblock \bibinfo{title}{Secure hash standard (shs), fips pub 180-4}.
+\newblock \bibinfo{howpublished}{Federal Information Processing Standards
+  Publication 180-4}.
+%Type = Inproceedings
+\bibitem[{Nguyen et~al.(2023)Nguyen, Le, Dau, Nguyen, Nghiem, Guo and
+  Bui}]{nguyen2023vault}
+\bibinfo{author}{Nguyen, D.M.}, \bibinfo{author}{Le, N.H.},
+  \bibinfo{author}{Dau, A.T.V.}, \bibinfo{author}{Nguyen, A.M.},
+  \bibinfo{author}{Nghiem, K.}, \bibinfo{author}{Guo, J.},
+  \bibinfo{author}{Bui, N.D.Q.}, \bibinfo{year}{2023}.
+\newblock \bibinfo{title}{The vault: A comprehensive multilingual dataset for
+  advancing code understanding and generation}, in:
+  \bibinfo{booktitle}{Findings of the Association for Computational
+  Linguistics: EMNLP 2023}, pp. \bibinfo{pages}{7988--8020}.
+%Type = Inproceedings
+\bibitem[{Papineni et~al.(2002)Papineni, Roukos, Ward and
+  Zhu}]{papineni2002bleu}
+\bibinfo{author}{Papineni, K.}, \bibinfo{author}{Roukos, S.},
+  \bibinfo{author}{Ward, T.}, \bibinfo{author}{Zhu, W.J.},
+  \bibinfo{year}{2002}.
+\newblock \bibinfo{title}{Bleu: A method for automatic evaluation of machine
+  translation}, in: \bibinfo{booktitle}{Proceedings of the 40th Annual Meeting
+  of the Association for Computational Linguistics}, pp.
+  \bibinfo{pages}{311--318}.
+%Type = Article
+\bibitem[{Parisi et~al.(2019)Parisi, Kemker, Part, Kanan and
+  Wermter}]{parisi2019continual}
+\bibinfo{author}{Parisi, G.I.}, \bibinfo{author}{Kemker, R.},
+  \bibinfo{author}{Part, J.L.}, \bibinfo{author}{Kanan, C.},
+  \bibinfo{author}{Wermter, S.}, \bibinfo{year}{2019}.
+\newblock \bibinfo{title}{Continual lifelong learning with neural networks: A
+  review}.
+\newblock \bibinfo{journal}{Neural Networks} \bibinfo{volume}{113},
+  \bibinfo{pages}{54--71}.
+%Type = Article
+\bibitem[{Prenner and Robbes(2023)}]{prenner2023runbugrun}
+\bibinfo{author}{Prenner, J.A.}, \bibinfo{author}{Robbes, R.},
+  \bibinfo{year}{2023}.
+\newblock \bibinfo{title}{Runbugrun: An executable dataset for automated
+  program repair}.
+\newblock \bibinfo{journal}{arXiv preprint arXiv:2304.01102} .
+%Type = Inproceedings
+\bibitem[{Qian et~al.(2025)Qian, Gao, Ding, Zhou, Liang, Duan, Liu, Zhao and
+  Tang}]{qian2025treelora}
+\bibinfo{author}{Qian, Y.}, \bibinfo{author}{Gao, J.}, \bibinfo{author}{Ding,
+  N.}, \bibinfo{author}{Zhou, Y.}, \bibinfo{author}{Liang, J.},
+  \bibinfo{author}{Duan, Y.}, \bibinfo{author}{Liu, Z.}, \bibinfo{author}{Zhao,
+  W.X.}, \bibinfo{author}{Tang, J.}, \bibinfo{year}{2025}.
+\newblock \bibinfo{title}{Treelora: Efficient continual learning via layer-wise
+  loras guided by a hierarchical gradient-similarity tree}, in:
+  \bibinfo{booktitle}{International Conference on Machine Learning}.
+%Type = Inproceedings
+\bibitem[{Razdaibiedina et~al.(2023)Razdaibiedina, Mao, Hou, Khabsa, Lewis and
+  Almahairi}]{razdaibiedina2023progressive}
+\bibinfo{author}{Razdaibiedina, A.}, \bibinfo{author}{Mao, Y.},
+  \bibinfo{author}{Hou, R.}, \bibinfo{author}{Khabsa, M.},
+  \bibinfo{author}{Lewis, M.}, \bibinfo{author}{Almahairi, A.},
+  \bibinfo{year}{2023}.
+\newblock \bibinfo{title}{Progressive prompts: Continual learning for language
+  models}, in: \bibinfo{booktitle}{International Conference on Learning
+  Representations}.
+%Type = Article
+\bibitem[{Ren et~al.(2020)Ren, Guo, Lu, Zhou, Liu, Tang, Sundaresan, Zhou,
+  Blanco and Ma}]{ren2020codebleu}
+\bibinfo{author}{Ren, S.}, \bibinfo{author}{Guo, D.}, \bibinfo{author}{Lu, S.},
+  \bibinfo{author}{Zhou, L.}, \bibinfo{author}{Liu, S.}, \bibinfo{author}{Tang,
+  D.}, \bibinfo{author}{Sundaresan, N.}, \bibinfo{author}{Zhou, M.},
+  \bibinfo{author}{Blanco, A.}, \bibinfo{author}{Ma, S.}, \bibinfo{year}{2020}.
+\newblock \bibinfo{title}{Codebleu: A method for automatic evaluation of code
+  synthesis}.
+\newblock \bibinfo{journal}{arXiv preprint arXiv:2009.10297} .
+%Type = Article
+\bibitem[{Rozi{`e}re et~al.(2023)Rozi{`e}re, Gehring, Gloeckle, Sootla, Gat,
+  Tan, Adi, Liu, Sauvestre, Remez et~al.}]{roziere2023codellama}
+\bibinfo{author}{Rozi{`e}re, B.}, \bibinfo{author}{Gehring, J.},
+  \bibinfo{author}{Gloeckle, F.}, \bibinfo{author}{Sootla, S.},
+  \bibinfo{author}{Gat, I.}, \bibinfo{author}{Tan, X.E.}, \bibinfo{author}{Adi,
+  Y.}, \bibinfo{author}{Liu, J.}, \bibinfo{author}{Sauvestre, R.},
+  \bibinfo{author}{Remez, T.}, et~al., \bibinfo{year}{2023}.
+\newblock \bibinfo{title}{Code llama: Open foundation models for code}.
+\newblock \bibinfo{journal}{arXiv preprint arXiv:2308.12950} .
+%Type = Article
+\bibitem[{Rusu et~al.(2016)Rusu, Rabinowitz, Desjardins, Soyer, Kirkpatrick,
+  Kavukcuoglu, Pascanu and Hadsell}]{rusu2016progressive}
+\bibinfo{author}{Rusu, A.A.}, \bibinfo{author}{Rabinowitz, N.C.},
+  \bibinfo{author}{Desjardins, G.}, \bibinfo{author}{Soyer, H.},
+  \bibinfo{author}{Kirkpatrick, J.}, \bibinfo{author}{Kavukcuoglu, K.},
+  \bibinfo{author}{Pascanu, R.}, \bibinfo{author}{Hadsell, R.},
+  \bibinfo{year}{2016}.
+\newblock \bibinfo{title}{Progressive neural networks}.
+\newblock \bibinfo{journal}{arXiv preprint arXiv:1606.04671} .
+%Type = Inproceedings
+\bibitem[{Serr{`a} et~al.(2018)Serr{`a}, Suris, Miron and
+  Karatzoglou}]{serra2018overcoming}
+\bibinfo{author}{Serr{`a}, J.}, \bibinfo{author}{Suris, D.},
+  \bibinfo{author}{Miron, M.}, \bibinfo{author}{Karatzoglou, A.},
+  \bibinfo{year}{2018}.
+\newblock \bibinfo{title}{Overcoming catastrophic forgetting with hard
+  attention to the task}, in: \bibinfo{booktitle}{International Conference on
+  Machine Learning}, pp. \bibinfo{pages}{4548--4557}.
+%Type = Inproceedings
+\bibitem[{Shazeer et~al.(2017)Shazeer, Mirhoseini, Maziarz, Davis, Le, Hinton
+  and Dean}]{shazeer2017outrageously}
+\bibinfo{author}{Shazeer, N.}, \bibinfo{author}{Mirhoseini, A.},
+  \bibinfo{author}{Maziarz, K.}, \bibinfo{author}{Davis, A.},
+  \bibinfo{author}{Le, Q.V.}, \bibinfo{author}{Hinton, G.E.},
+  \bibinfo{author}{Dean, J.}, \bibinfo{year}{2017}.
+\newblock \bibinfo{title}{Outrageously large neural networks: The
+  sparsely-gated mixture-of-experts layer}, in:
+  \bibinfo{booktitle}{International Conference on Learning Representations}.
+%Type = Inproceedings
+\bibitem[{Shin et~al.(2017)Shin, Lee, Kim and Kim}]{shin2017continual}
+\bibinfo{author}{Shin, H.}, \bibinfo{author}{Lee, J.K.}, \bibinfo{author}{Kim,
+  J.}, \bibinfo{author}{Kim, J.}, \bibinfo{year}{2017}.
+\newblock \bibinfo{title}{Continual learning with deep generative replay}, in:
+  \bibinfo{booktitle}{Advances in Neural Information Processing Systems}.
+%Type = Article
+\bibitem[{Tufano et~al.(2019)Tufano, Watson, Bavota, Di~Penta, White and
+  Poshyvanyk}]{tufano2019empirical}
+\bibinfo{author}{Tufano, M.}, \bibinfo{author}{Watson, C.},
+  \bibinfo{author}{Bavota, G.}, \bibinfo{author}{Di~Penta, M.},
+  \bibinfo{author}{White, M.}, \bibinfo{author}{Poshyvanyk, D.},
+  \bibinfo{year}{2019}.
+\newblock \bibinfo{title}{An empirical study on learning bug-fixing patches in
+  the wild via neural machine translation}.
+\newblock \bibinfo{journal}{ACM Transactions on Software Engineering and
+  Methodology} \bibinfo{volume}{28}, \bibinfo{pages}{19:1--19:29}.
+%Type = Inproceedings
+\bibitem[{Vaswani et~al.(2017)Vaswani, Shazeer, Parmar, Uszkoreit, Jones,
+  Gomez, Kaiser and Polosukhin}]{vaswani2017attention}
+\bibinfo{author}{Vaswani, A.}, \bibinfo{author}{Shazeer, N.},
+  \bibinfo{author}{Parmar, N.}, \bibinfo{author}{Uszkoreit, J.},
+  \bibinfo{author}{Jones, L.}, \bibinfo{author}{Gomez, A.N.},
+  \bibinfo{author}{Kaiser, L.}, \bibinfo{author}{Polosukhin, I.},
+  \bibinfo{year}{2017}.
+\newblock \bibinfo{title}{Attention is all you need}, in:
+  \bibinfo{booktitle}{Advances in Neural Information Processing Systems}.
+%Type = Inproceedings
+\bibitem[{Wang et~al.(2025)Wang, Lyu, Sun and Jing}]{wang2025continual}
+\bibinfo{author}{Wang, C.}, \bibinfo{author}{Lyu, Y.}, \bibinfo{author}{Sun,
+  Z.}, \bibinfo{author}{Jing, L.}, \bibinfo{year}{2025}.
+\newblock \bibinfo{title}{Continual gradient low-rank projection fine-tuning
+  for llms}, in: \bibinfo{booktitle}{Proceedings of the 63rd Annual Meeting of
+  the Association for Computational Linguistics}.
+%Type = Article
+\bibitem[{Wang et~al.(2023a)Wang, Zhang, Su and Zhu}]{wang2023comprehensive}
+\bibinfo{author}{Wang, L.}, \bibinfo{author}{Zhang, X.}, \bibinfo{author}{Su,
+  H.}, \bibinfo{author}{Zhu, J.}, \bibinfo{year}{2023}a.
+\newblock \bibinfo{title}{A comprehensive survey of continual learning: Theory,
+  method and application}.
+\newblock \bibinfo{journal}{arXiv preprint arXiv:2302.00487} .
+%Type = Article
+\bibitem[{Wang et~al.(2023b)Wang, Chen, Ge, Xia, Bao, Zheng, Zhang, Gui and
+  Huang}]{wang2023orthogonal}
+\bibinfo{author}{Wang, X.}, \bibinfo{author}{Chen, T.}, \bibinfo{author}{Ge,
+  Q.}, \bibinfo{author}{Xia, H.}, \bibinfo{author}{Bao, R.},
+  \bibinfo{author}{Zheng, R.}, \bibinfo{author}{Zhang, Q.},
+  \bibinfo{author}{Gui, T.}, \bibinfo{author}{Huang, X.},
+  \bibinfo{year}{2023}b.
+\newblock \bibinfo{title}{Orthogonal subspace learning for language model
+  continual learning}.
+\newblock \bibinfo{journal}{arXiv preprint arXiv:2310.14152} .
+%Type = Inproceedings
+\bibitem[{Wang et~al.(2023c)Wang, Le, Gotmare, Bui, Li and
+  Hoi}]{wang2023codet5plus}
+\bibinfo{author}{Wang, Y.}, \bibinfo{author}{Le, H.}, \bibinfo{author}{Gotmare,
+  A.D.}, \bibinfo{author}{Bui, N.D.Q.}, \bibinfo{author}{Li, J.},
+  \bibinfo{author}{Hoi, S.C.H.}, \bibinfo{year}{2023}c.
+\newblock \bibinfo{title}{Codet5+: Open code large language models for code
+  understanding and generation}, in: \bibinfo{booktitle}{Proceedings of the
+  2023 Conference on Empirical Methods in Natural Language Processing}, pp.
+  \bibinfo{pages}{1069--1088}.
+%Type = Inproceedings
+\bibitem[{Wang et~al.(2021)Wang, Wang, Joty and Hoi}]{wang2021codet5}
+\bibinfo{author}{Wang, Y.}, \bibinfo{author}{Wang, W.}, \bibinfo{author}{Joty,
+  S.}, \bibinfo{author}{Hoi, S.C.H.}, \bibinfo{year}{2021}.
+\newblock \bibinfo{title}{Codet5: Identifier-aware unified pre-trained
+  encoder-decoder models for code understanding and generation}, in:
+  \bibinfo{booktitle}{Proceedings of the 2021 Conference on Empirical Methods
+  in Natural Language Processing}, pp. \bibinfo{pages}{8696--8708}.
+%Type = Inproceedings
+\bibitem[{Wang et~al.(2022)Wang, Zhang, Ebrahimi, Sun, Zhang, Lee, Ren, Su,
+  Perot, Dy and Pfister}]{wang2022learning}
+\bibinfo{author}{Wang, Z.}, \bibinfo{author}{Zhang, Z.},
+  \bibinfo{author}{Ebrahimi, S.}, \bibinfo{author}{Sun, R.},
+  \bibinfo{author}{Zhang, H.}, \bibinfo{author}{Lee, C.Y.},
+  \bibinfo{author}{Ren, X.}, \bibinfo{author}{Su, G.}, \bibinfo{author}{Perot,
+  V.}, \bibinfo{author}{Dy, J.}, \bibinfo{author}{Pfister, T.},
+  \bibinfo{year}{2022}.
+\newblock \bibinfo{title}{Learning to prompt for continual learning}, in:
+  \bibinfo{booktitle}{Proceedings of the IEEE/CVF Conference on Computer Vision
+  and Pattern Recognition}, pp. \bibinfo{pages}{139--149}.
+%Type = Article
+\bibitem[{Wei et~al.(2023)Wei, Wang, Liu, Ding and Zhang}]{wei2023magicoder}
+\bibinfo{author}{Wei, Y.}, \bibinfo{author}{Wang, Z.}, \bibinfo{author}{Liu,
+  J.}, \bibinfo{author}{Ding, Y.}, \bibinfo{author}{Zhang, L.},
+  \bibinfo{year}{2023}.
+\newblock \bibinfo{title}{Magicoder: Empowering code generation with
+  oss-instruct}.
+\newblock \bibinfo{journal}{arXiv preprint arXiv:2312.02120} .
+%Type = Article
+\bibitem[{Wistuba et~al.(2023)Wistuba, Sivaprasad, Balles and
+  Zappella}]{wistuba2023continual}
+\bibinfo{author}{Wistuba, M.}, \bibinfo{author}{Sivaprasad, P.T.},
+  \bibinfo{author}{Balles, L.}, \bibinfo{author}{Zappella, G.},
+  \bibinfo{year}{2023}.
+\newblock \bibinfo{title}{Continual learning with low rank adaptation}.
+\newblock \bibinfo{journal}{arXiv preprint arXiv:2311.17601}
+  \bibinfo{note}{Accepted at the Workshop on Distribution Shifts (DistShift),
+  NeurIPS 2023}.
+%Type = Article
+\bibitem[{Xu et~al.(2025)Xu, Liu, Yin, Zhou and Poovendran}]{xu2025kodcode}
+\bibinfo{author}{Xu, Z.}, \bibinfo{author}{Liu, Y.}, \bibinfo{author}{Yin, Y.},
+  \bibinfo{author}{Zhou, M.}, \bibinfo{author}{Poovendran, R.},
+  \bibinfo{year}{2025}.
+\newblock \bibinfo{title}{Kodcode: A diverse, challenging, and verifiable
+  synthetic dataset for coding}.
+\newblock \bibinfo{journal}{arXiv preprint arXiv:2503.02951} .
+%Type = Article
+\bibitem[{Yadav et~al.(2023)Yadav, Sun, Ding, Li, Zhang, Tan, Ma, Bhatia,
+  Nallapati, Ramanathan, Bansal and Xiang}]{yadav2023exploring}
+\bibinfo{author}{Yadav, P.}, \bibinfo{author}{Sun, Q.}, \bibinfo{author}{Ding,
+  H.}, \bibinfo{author}{Li, X.}, \bibinfo{author}{Zhang, D.},
+  \bibinfo{author}{Tan, M.}, \bibinfo{author}{Ma, X.}, \bibinfo{author}{Bhatia,
+  P.}, \bibinfo{author}{Nallapati, R.}, \bibinfo{author}{Ramanathan, M.K.},
+  \bibinfo{author}{Bansal, M.}, \bibinfo{author}{Xiang, B.},
+  \bibinfo{year}{2023}.
+\newblock \bibinfo{title}{Exploring continual learning for code generation
+  models}.
+\newblock \bibinfo{journal}{arXiv preprint arXiv:2307.02435} .
+%Type = Inproceedings
+\bibitem[{Zenke et~al.(2017)Zenke, Poole and Ganguli}]{zenke2017continual}
+\bibinfo{author}{Zenke, F.}, \bibinfo{author}{Poole, B.},
+  \bibinfo{author}{Ganguli, S.}, \bibinfo{year}{2017}.
+\newblock \bibinfo{title}{Continual learning through synaptic intelligence},
+  in: \bibinfo{booktitle}{International Conference on Machine Learning}, pp.
+  \bibinfo{pages}{3987--3995}.
+%Type = Article
+\bibitem[{Zhang et~al.(2025)Zhang, Bai, Yang and Liang}]{zhang2025clora}
+\bibinfo{author}{Zhang, X.}, \bibinfo{author}{Bai, L.}, \bibinfo{author}{Yang,
+  X.}, \bibinfo{author}{Liang, J.}, \bibinfo{year}{2025}.
+\newblock \bibinfo{title}{C-lora: Continual low-rank adaptation for pre-trained
+  models}.
+\newblock \bibinfo{journal}{arXiv preprint arXiv:2502.17920} .
+%Type = Inproceedings
+\bibitem[{Zhu et~al.(2022)Zhu, Suresh, Korotkova, Aghajanyan, O'Gorman, Iyyer
+  and Reddy}]{zhu2022multilingual}
+\bibinfo{author}{Zhu, M.}, \bibinfo{author}{Suresh, T.R.},
+  \bibinfo{author}{Korotkova, E.}, \bibinfo{author}{Aghajanyan, A.},
+  \bibinfo{author}{O'Gorman, T.}, \bibinfo{author}{Iyyer, M.},
+  \bibinfo{author}{Reddy, S.}, \bibinfo{year}{2022}.
+\newblock \bibinfo{title}{Multilingual code snippets training for program
+  translation}, in: \bibinfo{booktitle}{Proceedings of the AAAI Conference on
+  Artificial Intelligence}, pp. \bibinfo{pages}{11783--11790}.
+
+\end{thebibliography}

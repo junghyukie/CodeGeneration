@@ -1,0 +1,129 @@
+\section{Evaluation}
+\label{sec:evaluation}
+
+\subsection{Research questions}
+\label{sec:rqs}
+
+The evaluation is organized around four research questions.
+
+\noindent\textbf{RQ1.} How does GMM-Router perform relative to state-of-the-art continual learning baselines on a diverse, non-executable, eight-task code generation sequence?
+
+\noindent\textbf{RQ2.} How does GMM-Router perform on a nine-language executable code generation benchmark judged by functional correctness, both on average and per programming language?
+
+\noindent\textbf{RQ3.} To what extent does GMM-Router mitigate catastrophic forgetting and support knowledge transfer relative to the baselines, and how accurately does its GMM router assign inputs to the correct task-specific expert?
+
+\noindent\textbf{RQ4.} Does the iterative refinement pipeline --- traceback routing combined with JSD-gated score combination --- improve performance on executable-benchmark samples that fail every Round-1 candidate?
+
+\subsection{Datasets}
+\label{sec:eval_datasets}
+
+Both evaluation tracks introduced in Section~\ref{sec:data} are used: the eight-task CodeTask benchmark (Table~\ref{tab:codetask_stats}, Figure~\ref{fig:codetask_sequence}), scored with text-overlap metrics, addresses RQ1 and the routing-accuracy component of RQ3; the nine-language executable benchmark (Table~\ref{tab:exec_stats}), scored by unit-test execution, addresses RQ2 and RQ4, and its executable-track routing behavior additionally informs RQ3. Training proceeds through each benchmark's task sequence once, in the fixed order shown in Figure~\ref{fig:codetask_sequence} for CodeTask and the language order Python, C++, Swift, Rust, C\#, Java, PHP, TypeScript, Shell for the executable benchmark; validation after each task evaluates the model on every task seen so far, which is what makes the forgetting and transfer metrics defined in Section~\ref{sec:metrics} (Eqs.~\eqref{eq:fm}--\eqref{eq:bwt_fwt}) computable, while the tables in Section~\ref{sec:results} report the final scores after the full sequence has been learned. Maximum training size per task is capped at 100{,}000 examples, validation at 2{,}000, and test at 5{,}000, depending on the dataset (Table~\ref{tab:codetask_stats}).
+
+\subsection{Configurations}
+\label{sec:setup}
+
+\subsubsection{Base model and baselines}
+\label{sec:baselines}
+
+All experiments use Qwen2.5-Coder-1.5B \citep{hui2024qwen25coder}, a decoder-only code language model (Section~\ref{sec:clm_background}) that is large enough to provide strong code-generation ability while remaining practical for repeated continual learning runs. GMM-Router is compared against seven continual learning baselines chosen to cover the main methodological directions (Section~\ref{sec:related_work}), plus one task-identity upper bound.
+
+\emph{LoRA per task} trains an independent LoRA module per task with the backbone frozen and selects the module matching the true task label at inference \citep{hu2022lora}; because no adapter is ever overwritten, it removes catastrophic forgetting by construction and serves as an optimistic upper bound that requires task identity and storage that grows linearly with $K$. \emph{EWC} \citep{kirkpatrick2017overcoming} trains a single shared parameter set and penalizes changes to parameters the Fisher information marks as important for earlier tasks. \emph{L2P} \citep{wang2022learning} keeps the backbone frozen and learns a shared pool of soft prompts retrieved per input. \emph{ProgPrompt} \citep{razdaibiedina2023progressive} learns a new soft prompt per task while freezing previously learned prompts. \emph{SeqLoRA} trains one shared LoRA module sequentially across all tasks with no isolation mechanism, representing an aggressive, forgetting-prone form of parameter sharing. \emph{O-LoRA} \citep{wang2023orthogonal} extends sequential LoRA with an orthogonality constraint between successive task updates. \emph{Online-CL-LLM} \citep{cheng2025exploiting} characterizes each PEFT block by a representative feature distribution and dynamically selects blocks per input without task labels, making it the baseline methodologically closest to GMM-Router. \emph{TreeLoRA} \citep{qian2025treelora} organizes adapters in a hierarchical tree by gradient similarity between tasks, sharing structure between related tasks while separating unrelated ones. Table~\ref{tab:method_comparison} summarizes the baselines and GMM-Router along ten design properties.
+
+\begin{table}[t]
+\centering
+\caption{Property comparison of baselines and GMM-Router. \ymark{} = has property; \xmark{} = lacks property. \textbf{Back.} = backbone frozen; \textbf{Isol.} = dedicated module per task; \textbf{Agn.} = no task identity needed at inference; \textbf{Repl.} = stores/replays raw data; \textbf{Rout.} = routes via learned feature distributions; \textbf{Shar.} = models cross-task parameter relationships; \textbf{Reg.} = applies parameter regularization; \textbf{Refine.} = iteratively refines failed predictions using execution feedback.}
+\label{tab:method_comparison}
+\scriptsize
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lcccccccccc}
+\toprule
+Method & Back. & Isol. & Agn. & Repl. & LoRA & Prompt & Rout. & Shar. & Reg. & Refine. \\
+\midrule
+LoRA per task  & \ymark & \ymark & \xmark & \xmark & \ymark & \xmark & \xmark & \xmark & \xmark & \xmark \\
+EWC            & \xmark & \xmark & \ymark & \xmark & \xmark & \xmark & \xmark & \xmark & \ymark & \xmark \\
+L2P            & \ymark & \xmark & \ymark & \xmark & \xmark & \ymark & \xmark & \xmark & \xmark & \xmark \\
+ProgPrompt     & \ymark & \ymark & \ymark & \xmark & \xmark & \ymark & \xmark & \xmark & \xmark & \xmark \\
+SeqLoRA        & \ymark & \xmark & \ymark & \xmark & \ymark & \xmark & \xmark & \xmark & \xmark & \xmark \\
+O-LoRA         & \ymark & \xmark & \ymark & \xmark & \ymark & \xmark & \xmark & \xmark & \ymark & \xmark \\
+Online-CL-LLM  & \ymark & \ymark & \ymark & \xmark & \ymark & \xmark & \ymark & \xmark & \xmark & \xmark \\
+TreeLoRA       & \ymark & \xmark & \ymark & \xmark & \ymark & \xmark & \xmark & \ymark & \xmark & \xmark \\
+\midrule
+\textbf{GMM-Router} & \ymark & \ymark & \ymark & \xmark & \ymark & \xmark & \ymark & \xmark & \xmark & \ymark \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\subsubsection{Hyperparameters}
+\label{sec:hyperparams}
+
+For the CodeTask benchmark, the eight-task order follows Figure~\ref{fig:codetask_sequence}; for the executable benchmark, the nine-language order is Python, C++, Swift, Rust, C\#, Java, PHP, TypeScript, Shell. All methods train for 3 epochs per task with batch size 32, learning rate $10^{-4}$, warmup ratio 0.01, and weight decay 0.01. Padding tokens are masked in the labels (target value $-100$) so they do not contribute to the loss, and long inputs are truncated based on each dataset's input-length distribution.
+
+LoRA-based methods use rank $r=16$, $\mathtt{lora\_alpha}=32$, $\mathtt{lora\_dropout}=0.1$, applied to the attention query and value projections (\texttt{q\_proj}, \texttt{v\_proj}) with no trained bias parameters. After each adapter is trained, it is run on the held-out calibration split to generate $n=5$ candidate predictions per problem (temperature $0.2$, top-$p=0.95$); the stored output --- instruction, five candidates, pass/fail result, and error string per failed candidate --- feeds both the traceback router and adapter refinement. Table~\ref{tab:router_comparison} compares the instruction and traceback router hyperparameters; the traceback router's higher EM iteration budget compensates for its smaller, post-deduplication training set, and its input is truncated from the left so the final lines of a traceback --- which carry the error type and message --- are preserved. Adapter refinement continues training the existing per-task adapter at learning rate $5\times10^{-5}$ for 3 epochs, weight decay $0.01$, effective batch size 8, and a maximum prompt length of 4096 tokens to accommodate the concatenated instruction, buggy code, and traceback.
+
+\begin{table}[t]
+\centering
+\caption{Hyperparameters of the instruction and traceback routers.}
+\label{tab:router_comparison}
+\small
+\begin{tabular}{lcc}
+\toprule
+Hyperparameter & Instruction & Traceback \\
+\midrule
+Routing layer $\ell^*$ & 4 & 4 \\
+Routing dimension $p$ & 256 & 256 \\
+Max input length & 2048 & 256 \\
+Truncation side & right & left \\
+Variance floor $\sigma^2_{\min}$ & 0.02 & $10^{-3}$ \\
+EM max iterations $T_{\max}$ & 50 & 100 \\
+EM tolerance $\delta$ & $10^{-4}$ & $10^{-4}$ \\
+GMM components $M$ & 4 & 4 \\
+Training samples & up to 5{,}000 & up to 600 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+For Round-1 inference, the routing temperature is $\tau=1.0$. On the CodeTask benchmark, hard routing is used with generation temperature $0.2$, top-$p=0.95$, and up to 512 newly generated tokens. On the executable benchmark, soft routing is used, generating 5 candidates per sample (up to 2048 tokens) to support Pass@$k$ evaluation. Round-2 inference applies only to the executable benchmark: per-router temperatures default to $1.0$ and failed samples produce one new prediction with greedy decoding.
+
+\subsubsection{Evaluation metrics}
+\label{sec:metrics}
+
+The non-executable and executable tracks use different metrics because they capture different aspects of code generation quality. For the non-executable benchmark, BLEU \citep{papineni2002bleu} measures $n$-gram overlap between a generated sequence and one or more references using modified precision $p_n$ (each $n$-gram count in the hypothesis clipped by its maximum occurrence across references) and a brevity penalty $\mathrm{BP}$ that equals 1 when the hypothesis is at least as long as the reference and $\exp(1-r/c)$ otherwise, for hypothesis length $c$ and reference length $r$:
+\begin{equation}
+\mathrm{BLEU} = \mathrm{BP} \cdot \exp\!\left(\sum_{n=1}^{4} \tfrac{1}{4} \log p_n\right).
+\label{eq:bleu}
+\end{equation}
+CodeBLEU \citep{ren2020codebleu} extends BLEU with code-specific components, since code quality depends on syntactic and semantic structure as well as token overlap:
+\begin{align}
+\mathrm{CodeBLEU} ={} & \alpha \cdot \mathrm{NgramMatch} \notag \\
+& + \beta \cdot \mathrm{WeightedNgramMatch} \notag \\
+& + \gamma \cdot \mathrm{SyntaxMatch} \notag \\
+& + \delta \cdot \mathrm{DataflowMatch},
+\label{eq:codebleu}
+\end{align}
+with $\alpha=\beta=\gamma=\delta=0.25$. \texttt{NgramMatch} is standard BLEU-style precision; \texttt{WeightedNgramMatch} up-weights language keywords and operators; \texttt{SyntaxMatch} compares abstract syntax trees by tree-edit distance; \texttt{DataflowMatch} compares variable-level data-flow relations, capturing semantic equivalence that token matching misses. Neither metric can fully distinguish code that is functionally correct from code that merely looks similar to a reference, which motivates the executable track.
+
+For the executable benchmark, the main metric is Pass@$k$ \citep{chen2021evaluating}: the probability that at least one of $k\leq n$ sampled candidates passes all unit tests, given $n$ sampled candidates of which $c$ pass,
+\begin{equation}
+\mathrm{Pass@}k = 1 - \frac{\binom{n-c}{k}}{\binom{n}{k}},
+\label{eq:passk}
+\end{equation}
+defined as $1$ when $n-c<k$. This paper reports Pass@1 (whether the first candidate is correct) and Pass@5 (whether any of five candidates is correct), which is informative in multilingual code generation where a problem may admit several correct implementations. Together, BLEU, CodeBLEU, and Pass@$k$ let this paper evaluate both textual quality and functional correctness across the two complementary benchmark settings.
+
+Three further metrics quantify continual learning behavior on top of either per-task metric: BLEU/CodeBLEU on the CodeTask benchmark, or Pass@$k$ on the executable benchmark. Let $a_{i,j}$ denote the per-task metric value on task $\mathcal{T}_j$ after training on tasks $\mathcal{T}_1,\ldots,\mathcal{T}_i$. The Forgetting Measure (FM) \citep{wang2023comprehensive} captures the drop from each task's best observed performance to its current performance:
+\begin{equation}
+f_{j,k} = \max_{i \in \{1,\ldots,k-1\}} (a_{i,j} - a_{k,j}), \qquad
+\mathrm{FM}_k = \frac{1}{k-1}\sum_{j=1}^{k-1} f_{j,k}.
+\label{eq:fm}
+\end{equation}
+Backward Transfer (BWT) measures how training on later tasks affects earlier ones:
+\begin{equation}
+\mathrm{BWT}_k = \frac{1}{k-1}\sum_{j=1}^{k-1}(a_{k,j}-a_{j,j}).
+\label{eq:bwt}
+\end{equation}
+Forward Transfer (FWT) measures the extent to which learning previous tasks improves the model's performance on a new task before the model is trained on that task:
+\begin{equation}
+\mathrm{FWT}_k = \frac{1}{k-1}\sum_{j=2}^{k}\left(a_{j-1,j} - a_{0,j}\right),
+\label{eq:bwt_fwt}
+\end{equation}
+where $a_{j-1,j}$ is the performance on task $\mathcal{T}_j$ after training on tasks $\mathcal{T}_1,\ldots,\mathcal{T}_{j-1}$ but before training on $\mathcal{T}_j$, and $a_{0,j}$ is the performance of the initial pretrained model on task $\mathcal{T}_j$ prior to any continual-learning training; $a_{j-1,j}-a_{0,j}$ thus quantifies the change in zero-shot performance on task $\mathcal{T}_j$ resulting from learning the preceding tasks. This definition follows the forward-transfer metric introduced by \citet{lopezpaz2017gem}, with the randomly initialized reference performance replaced by the initial pretrained-model performance, which provides a more meaningful baseline for pretrained code language models. Negative BWT indicates net forgetting; a positive FWT value indicates that knowledge acquired from previous tasks improves generalization to unseen tasks, a negative value indicates that previous training reduces the model's initial ability to perform the new task, and a value close to zero indicates that learning the preceding tasks has little effect on performance on future tasks.

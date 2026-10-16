@@ -1,0 +1,176 @@
+\section{Methodology}
+\label{sec:methodology}
+
+This section presents GMM-Router, a framework for parameter-efficient continual code generation that routes each query to task-specific experts without retraining earlier adapters or retaining raw training data. GMM-Router has four components: task-specific LoRA expert training (Section~\ref{sec:experts}); routing feature extraction through a frozen backbone and a fixed orthonormal projection (Section~\ref{sec:features}); a continual GMM instruction router that supports hard and soft routing (Sections~\ref{sec:router} and~\ref{sec:soft_routing}); and, for the executable benchmark, an iterative refinement pipeline built around a second, traceback-based router (Section~\ref{sec:traceback}).
+
+At a high level, GMM-Router processes the task sequence as follows. For each new task, a dedicated LoRA adapter and a GMM instruction router are trained in parallel (Sections~\ref{sec:experts}--\ref{sec:router}). At inference, the instruction router scores the query against every trained task and produces a routing distribution over adapters, which is used to select the highest-weighted adapter for hard routing or to merge all adapters for soft routing (Section~\ref{sec:soft_routing}); this constitutes Round-1 inference and is the only inference mechanism used on the CodeTask benchmark. On the executable benchmark, adapters are additionally evaluated on a held-out calibration split (Section~\ref{sec:setup}) whose failed predictions are used to refine each adapter on repair pairs and to fit a traceback GMM on error messages (Section~\ref{sec:traceback}); for any test sample whose five Round-1 candidates all fail execution, a second inference round combines the instruction and traceback routing signals through a Jensen--Shannon-divergence (JSD) gated rule to produce one additional prediction (Section~\ref{sec:round2}).
+
+% ---------------------------------------------------------------------------
+\subsection{Training task-specific experts}
+\label{sec:experts}
+% ---------------------------------------------------------------------------
+
+For each task $\mathcal{T}_k$ with training dataset $\mathcal{D}_k$ (Eq.~\eqref{eq:dataset}), GMM-Router trains a task-specific LoRA adapter \citep{hu2022lora} on top of a shared frozen backbone, following the LoRA formulation in Section~\ref{sec:peft_background}. Each adapter is a low-rank update applied to the query and value projections in every transformer layer. Only the adapter parameters $\Theta_k=\{B_k^{(\ell)},A_k^{(\ell)}\}_\ell$ are updated; the backbone and all previously trained adapters remain frozen throughout training, so a new task cannot interfere with previously learned ones. The training objective is the negative log-likelihood of the target sequence,
+\begin{equation}
+    \mathcal{L}_k(\Theta_k) = -\sum_{(x,y)\in\mathcal{D}_k} \sum_{t=1}^{|y|}
+    \log p_k(y_t \mid x, y_{<t}),
+    \label{eq:task_loss}
+\end{equation}
+where $p_k(y_t\mid x,y_{<t})$ is the output distribution of expert $k$ at decoding step $t$. The backbone is split at layer $\ell^*$: layers $0$ through $\ell^*{-}1$ produce the frozen features used for routing (Section~\ref{sec:features}), while LoRA adapters modify layers $\ell^*$ through $L$. A larger $\ell^*$ dedicates more layers to routing features but leaves fewer layers for task-specific adaptation.
+
+% ---------------------------------------------------------------------------
+\subsection{Routing feature extraction}
+\label{sec:features}
+% ---------------------------------------------------------------------------
+
+Stable routing requires a fixed representation space: if the feature map changed as new tasks arrived, GMMs fitted on earlier tasks would become misaligned with those fitted later. GMM-Router achieves this by extracting features from the frozen part of the backbone --- with all LoRA adapters disabled, so the routing space is independent of any per-task adapter weights --- and projecting them with a random matrix drawn once and fixed for the entire continual training run.
+
+For a tokenized input of length $T$, the backbone produces hidden states $\mathbf{H}^{(\ell)}\in\mathbb{R}^{T\times d}$ at each layer $\ell$; the routing representation is taken at layer $\ell^*$, $\mathbf{H}=\mathbf{H}^{(\ell^*)}$. Using an intermediate layer yields representations that are less task-specific and more stable as tasks accumulate. The sequence-level representation is the mean of the token hidden states,
+\begin{equation}
+    \tilde{\mathbf{h}} = \frac{1}{T}\sum_{t=1}^{T} \mathbf{h}_t \in \mathbb{R}^d,
+    \label{eq:meanpool}
+\end{equation}
+and parameter-free layer normalization removes scale differences,
+\begin{equation}
+    \mathbf{h} = \operatorname{LN}(\tilde{\mathbf{h}}), \qquad
+    \operatorname{LN}(\mathbf{v}) = \frac{\mathbf{v} - \mu_{\mathbf{v}}}{\sigma_{\mathbf{v}} + \varepsilon},
+    \label{eq:ln}
+\end{equation}
+where $\mu_\mathbf{v}$ and $\sigma_\mathbf{v}$ are the mean and standard deviation of the elements of $\mathbf{v}$. A fixed projection matrix $\mathbf{P}\in\mathbb{R}^{p\times d}$ then reduces the dimension to $p\ll d$: a random Gaussian matrix is drawn with a fixed seed, its thin QR factorization gives $\mathbf{P}$, so that $\mathbf{P}\mathbf{P}^\top=\mathbf{I}_p$. The routing embedding for input $x$ is
+\begin{equation}
+    \mathbf{z} = \mathbf{P}\,\mathbf{h} \in \mathbb{R}^p.
+    \label{eq:z}
+\end{equation}
+Because $\mathbf{P}$ never changes, the routing embedding (Eq.~\eqref{eq:z}) lies in a fixed $p$-dimensional space for every task, so GMM densities fitted at any point in the sequence remain directly comparable to those fitted later.
+
+% ---------------------------------------------------------------------------
+\subsection{Continual GMM instruction router}
+\label{sec:router}
+% ---------------------------------------------------------------------------
+
+Each task's instruction distribution is modeled as a diagonal GMM with $M$ components (Eq.~\eqref{eq:gmm}), fitted by EM (Algorithm~\ref{alg:em_gmm}) on the routing embeddings $\{\mathbf{z}_i^{(k)}\}_{i=1}^N$ of task $k$. When task $k$ arrives, its GMM is fitted and appended to the router registry; no parameters belonging to earlier tasks are modified.
+
+\textbf{MAP scoring with a uniform class prior.} At inference, the router scores each registered task $k$ using the log-posterior under a uniform prior over the $K$ trained tasks,
+\begin{equation}
+    s_k(\mathbf{z}) = \log p_k(\mathbf{z}) + \log \frac{1}{K}.
+    \label{eq:snorm}
+\end{equation}
+Since $\log(1/K)$ is constant across tasks, the argmax decision is equivalent to selecting the highest log-likelihood; the prior term keeps scores on a consistent scale as $K$ grows.
+
+\textbf{Hard routing.} Given a query embedding $\mathbf{z}$, the hard router selects the task with the highest score,
+\begin{equation}
+    \hat{k} = \operatorname*{argmax}_{k \in \{1,\ldots,K\}} \; s_k(\mathbf{z}),
+    \label{eq:routing}
+\end{equation}
+and generation proceeds using only expert $\hat{k}$'s adapter. This is the default inference strategy for the CodeTask benchmark.
+
+% ---------------------------------------------------------------------------
+\subsection{Soft routing and adapter merging}
+\label{sec:soft_routing}
+% ---------------------------------------------------------------------------
+
+Rather than committing to a single expert, soft routing converts the log-posterior scores into a probability distribution over all $K$ tasks via a temperature-scaled softmax,
+\begin{equation}
+    \alpha_k(x) = \frac{\exp\!\left(s_k(\mathbf{z}) / \tau\right)}{\sum_{j=1}^K \exp\!\left(s_j(\mathbf{z}) / \tau\right)}, \qquad \bm{\alpha}(x) \in \Delta^{K-1},
+    \label{eq:alpha}
+\end{equation}
+where $\tau>0$ is the routing temperature; as $\tau\to0^+$, $\bm{\alpha}(x)\to\mathbf{e}_{\hat{k}}$ recovers hard routing, and as $\tau\to\infty$, $\bm{\alpha}(x)\to\mathbf{1}/K$ becomes uniform. The $K$ LoRA adapters are then merged at the weight level,
+\begin{equation}
+    \Delta W_{\mathrm{merged}} = \sum_{k=1}^K \alpha_k(x)\, B_k A_k,
+    \label{eq:weight_merge}
+\end{equation}
+yielding a single merged adapter applied to the frozen backbone for generation, at the cost of only one forward pass per decoding step regardless of $K$. Weight-level merging (Eq.~\eqref{eq:weight_merge}) approximates the mixture-of-experts output distribution $p_{\mathrm{mix}}(y_t\mid x,y_{<t})=\sum_k \alpha_k(x)\,p_k(y_t\mid x,y_{<t})$, which would otherwise require $K$ independent forward passes; because $\alpha_k(x)$ depends only on $x$, the routing weights are computed once per query and held fixed throughout autoregressive decoding. Algorithm~\ref{alg:generation} summarizes soft-routing generation, and Figure~\ref{fig:arch} illustrates the resulting Round-1 inference pipeline.
+
+\begin{algorithm}[t]
+\caption{Soft-Routing Expert-Mixture Generation}
+\label{alg:generation}
+\KwIn{Query $x$; log-posterior scores $\{s_k(\mathbf{z})\}$; adapters $\{(B_k, A_k)\}_{k=1}^K$; temperature $\tau$}
+\KwOut{Generated output $\hat{y}$}
+Extract routing embedding $\mathbf{z}$ with LoRA adapters disabled\;
+$\alpha_k \leftarrow \exp(s_k(\mathbf{z})/\tau)/\sum_j\exp(s_j(\mathbf{z})/\tau)$, $\forall k$\;
+Merge adapters: $\Delta W \leftarrow \sum_k \alpha_k B_k A_k$\;
+Generate $\hat{y}$ with the merged adapter\;
+\Return $\hat{y}$\;
+\end{algorithm}
+
+\begin{figure}[t]
+\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[
+    font=\small,
+    shared/.style={draw=blue!55!black, line width=0.8pt, rounded corners=5pt,
+        minimum width=2.2cm, minimum height=0.90cm, align=center, fill=blue!10},
+    znode/.style={draw=blue!55!black, line width=0.8pt, rounded corners=5pt,
+        minimum width=1.0cm, minimum height=0.90cm, align=center, fill=blue!20},
+    rnode/.style={draw=violet!65!black, line width=0.8pt, rounded corners=5pt,
+        minimum width=2.6cm, minimum height=0.90cm, align=center, fill=violet!10},
+    enode/.style={draw=teal!65!black, line width=0.8pt, rounded corners=5pt,
+        minimum width=1.9cm, minimum height=0.90cm, align=center, fill=teal!10},
+    outnode/.style={draw=orange!65!black, line width=0.8pt, rounded corners=5pt,
+        minimum width=1.9cm, minimum height=0.90cm, align=center, fill=orange!12},
+    arr/.style= {-{Latex[length=5pt,width=4pt]}, thick, draw=gray!55},
+    rarr/.style={-{Latex[length=5pt,width=4pt]}, thick, draw=violet!60},
+    earr/.style={-{Latex[length=5pt,width=4pt]}, thick, draw=teal!60},
+    oarr/.style={-{Latex[length=5pt,width=4pt]}, thick, draw=orange!70!black},
+]
+\node[shared]                          at ( 0.0, 0) (x)      {Input $x$};
+\node[shared]                          at ( 2.7, 0) (enc)    {Backbone\\layers $0$--$\ell^*$};
+\node[znode]                           at ( 5.0, 0) (z)      {$\mathbf{z}$};
+\node[rnode]                           at ( 7.4, 0) (gmm)    {GMM Router\\$\log p_k(\mathbf{z})$};
+\node[rnode, minimum width=2.4cm]      at (10.5, 0) (scores) {Scores $s_k(\mathbf{z})$};
+\node[rnode, minimum width=2.0cm]      at (13.4, 0) (alpha)  {$\bm{\alpha}(x)$};
+\draw[arr]  (x)      -- (enc);
+\draw[arr]  (enc)    -- (z);
+\draw[rarr] (z)      -- (gmm);
+\draw[rarr] (gmm)    -- (scores);
+\draw[rarr] (scores) -- (alpha);
+\node[enode, minimum width=4.0cm] at (7.8, -2.8) (merge) {Merge LoRA:\\$\Delta W = \sum_k \alpha_k B_k A_k$};
+\node[outnode] at (12.5, -2.8) (out) {Generate\\$\hat{y}$};
+\draw[earr] (z.south) to[out=-90, in=180] (merge.west);
+\draw[rarr] (alpha.south) to[out=-145, in=90] (merge.north);
+\draw[oarr] (merge) -- (out);
+\begin{scope}[on background layer]
+    \fill[gray!6, rounded corners=10pt]
+        ($(x.north west)+(-0.18, 0.47)$) rectangle ($(out.south east)+(1.36,-0.42)$);
+    \node[draw=violet!28, fill=violet!5, rounded corners=9pt, inner sep=6pt,
+          fit=(gmm)(scores)(alpha)] (rpanel) {};
+    \node[draw=teal!28, fill=teal!5, rounded corners=9pt, inner sep=6pt,
+          fit=(merge)] (epanel) {};
+\end{scope}
+\node[font=\scriptsize\itshape, violet!70] at (rpanel.north) [above=2pt] {Router branch};
+\node[font=\scriptsize\itshape, teal!70]   at (epanel.south) [below=2pt] {Expert branch};
+\end{tikzpicture}}
+\caption{Round-1 inference pipeline of GMM-Router. The frozen backbone maps input $x$ to routing embedding $\mathbf{z}$ using layers $0$--$\ell^*$. The router branch (purple) evaluates the $K$ GMM log-densities, adds the uniform log-prior, and converts scores to routing weights $\bm{\alpha}(x)$. The expert branch (teal) merges the $K$ LoRA adapters as $\Delta W=\sum_k\alpha_k B_k A_k$ and generates output $\hat{y}$.}
+\label{fig:arch}
+\end{figure}
+
+% ---------------------------------------------------------------------------
+\subsection{Iterative refinement for executable code generation}
+\label{sec:traceback}
+% ---------------------------------------------------------------------------
+
+For executable code generation, GMM-Router supports a second refinement round for samples where all Round-1 predictions fail execution. A separate GMM traceback router is trained on runtime error messages rather than instruction prompts, providing a complementary routing signal, and each per-task adapter is optionally refined on repair pairs; both procedures use the calibration predictions described in Section~\ref{sec:setup}.
+
+\textbf{Traceback router.} The traceback router is a diagonal GMM (Section~\ref{sec:gmm_background}) fitted on error-message embeddings extracted from failed calibration predictions. For each failed candidate with a non-empty error string, the error text is collected and deduplicated; the resulting strings are encoded with the same frozen backbone used for instruction routing and projected into a separate routing space with its own fixed projection matrix, and a GMM is fitted per task using the EM procedure of Section~\ref{sec:gmm_background}.
+
+\textbf{Adapter refinement.} In parallel with traceback router training, each per-task LoRA adapter can be further fine-tuned on repair pairs derived from the evaluated calibration data. Each pair consists of the original instruction, buggy code, and runtime traceback as input, paired with a ground-truth or passing candidate as target: for each calibration sample, the first failed candidate with a non-empty error string supplies the (buggy code, traceback) pair, and the repair target is the first passing candidate, or the ground-truth solution if none of the five candidates passed; samples with no failed candidate or no repair target are skipped.
+
+\textbf{Round-2 inference and JSD-gated score combination.}
+\label{sec:round2}
+Round-2 inference applies only to samples where every Round-1 candidate failed. Let $\mathbf{s}_{\mathrm{in}}\in\mathbb{R}^K$ be the instruction router's Round-1 log-posterior scores and $\mathbf{s}_{\mathrm{tb}}\in\mathbb{R}^K$ the traceback router's scores on the corresponding error message; each is converted to a distribution, $\bm{\alpha}_{\mathrm{in}}=\operatorname{softmax}(\mathbf{s}_{\mathrm{in}}/\tau)$ and $\bm{\alpha}_{\mathrm{tb}}=\operatorname{softmax}(\mathbf{s}_{\mathrm{tb}})$. The two routers use fundamentally different signals --- natural-language problem descriptions versus runtime error messages --- so their agreement is informative about routing confidence: when both assign high probability to the same expert, that consensus is strong evidence the expert is correct; when they disagree, neither signal is fully trustworthy in isolation, and committing to either alone risks compounding the original routing error.
+
+This motivates gating the combination by the degree of conflict between the two distributions. Let $\mathbf{m}=\tfrac{1}{2}(\bm{\alpha}_{\mathrm{in}}+\bm{\alpha}_{\mathrm{tb}})$. The Kullback--Leibler divergence from $p$ to $q$ is $\mathrm{KL}(p\|q)=\sum_k p_k\log(p_k/q_k)$ \citep{kullback1951information}, and the Jensen--Shannon divergence \citep{lin1991divergence} is its symmetrized, bounded variant,
+\begin{equation}
+    \mathrm{JSD}(\bm{\alpha}_{\mathrm{in}} \| \bm{\alpha}_{\mathrm{tb}})
+    = \tfrac{1}{2}\mathrm{KL}(\bm{\alpha}_{\mathrm{in}}\|\mathbf{m})
+    + \tfrac{1}{2}\mathrm{KL}(\bm{\alpha}_{\mathrm{tb}}\|\mathbf{m}).
+    \label{eq:jsd}
+\end{equation}
+The combined routing weight is
+\begin{equation}
+    \bm{\alpha} = (1 - \mathrm{JSD})\operatorname{softmax}(\mathbf{s}_{\mathrm{in}} + \mathbf{s}_{\mathrm{tb}}) + \mathrm{JSD} \cdot \frac{\mathbf{1}}{K}.
+    \label{eq:jsd_gated}
+\end{equation}
+When the two routers agree (low JSD), the combined log-posterior $\mathbf{s}_{\mathrm{in}}+\mathbf{s}_{\mathrm{tb}}$ is trusted and converted into a peaked distribution; when they disagree strongly (high JSD), the distribution is blended toward uniform, spreading probability mass across all experts rather than committing to a potentially wrong one. The rule in Eq.~\eqref{eq:jsd_gated} requires no additional learned parameters or tuned thresholds. The final Round-2 prediction is generated using $\bm{\alpha}$ and the same weight-level adapter merging as in Round-1 (Eq.~\eqref{eq:weight_merge}).
+
+In summary, task-specific LoRA adapters prevent catastrophic forgetting through architectural isolation, since training on a new task updates only its dedicated adapter while all earlier adapters and the backbone remain frozen. Routing feature extraction projects frozen backbone representations through a fixed orthonormal matrix, keeping the routing space stable throughout the task sequence so GMM densities fitted at any point remain comparable as more tasks arrive. A per-task diagonal GMM fitted by EM models each task's instruction distribution and provides log-posterior scores for task-agnostic routing, realized as hard argmax selection for the CodeTask benchmark or temperature-scaled soft adapter merging for the executable benchmark; for the latter, the iterative refinement pipeline recovers samples that exhaust all Round-1 candidates by combining instruction and traceback routing signals through the JSD-gated rule.

@@ -1,0 +1,331 @@
+\relax 
+\providecommand\hyper@newdestlabel[2]{}
+\providecommand\HyField@AuxAddToFields[1]{}
+\providecommand\HyField@AuxAddToCoFields[2]{}
+\csgdef{mark@corau1}{1}
+\emailauthor{TODO@example.edu}{Tran An Khanh}
+\creditauthor{Conceptualization, Methodology, Software, Data curation, Investigation, Writing -- original draft}{Tran An Khanh}
+\providecommand \oddpage@label [2]{}
+\citation{wang2021codet5,roziere2023codellama,hui2024qwen25coder,lozhkov2024starcoder2,lu2021codexglue,chen2021evaluating,austin2021program}
+\citation{parisi2019continual,delange2021continual}
+\citation{mccloskey1989catastrophic,goodfellow2013empirical}
+\citation{yadav2023exploring}
+\citation{kirkpatrick2017overcoming,zenke2017continual,aljundi2018memory}
+\citation{wang2022learning,razdaibiedina2023progressive}
+\citation{wang2023orthogonal,wang2025continual,qian2025treelora}
+\@writefile{toc}{\contentsline {section}{\numberline {1}Introduction}{1}{section.1}\protected@file@percent }
+\newlabel{sec:introduction}{{1}{1}{Introduction}{section.1}{}}
+\citation{yadav2023exploring}
+\citation{papineni2002bleu}
+\citation{ren2020codebleu}
+\citation{chen2021evaluating,cassano2023multipl}
+\citation{yadav2023exploring}
+\citation{wei2023magicoder,chai2024mceval,austin2021program,cassano2023multipl}
+\citation{jaccard1901distribution,broder1997resemblance,indyk1998approximate}
+\citation{wang2021codet5}
+\citation{wang2023codet5plus}
+\citation{roziere2023codellama}
+\citation{lozhkov2024starcoder2}
+\citation{hui2024qwen25coder}
+\citation{vaswani2017attention}
+\citation{parisi2019continual,delange2021continual}
+\citation{mccloskey1989catastrophic,kirkpatrick2017overcoming}
+\citation{delange2021continual}
+\@writefile{toc}{\contentsline {section}{\numberline {2}Motivation and Background}{3}{section.2}\protected@file@percent }
+\newlabel{sec:background}{{2}{3}{Motivation and Background}{section.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1}Motivation}{3}{subsection.2.1}\protected@file@percent }
+\newlabel{sec:motivation}{{2.1}{3}{Motivation}{subsection.2.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.2}Code language models}{3}{subsection.2.2}\protected@file@percent }
+\newlabel{sec:clm_background}{{2.2}{3}{Code language models}{subsection.2.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3}Continual learning}{3}{subsection.2.3}\protected@file@percent }
+\newlabel{sec:cl_background}{{2.3}{3}{Continual learning}{subsection.2.3}{}}
+\newlabel{eq:dataset}{{1}{3}{Continual learning}{equation.2.1}{}}
+\citation{lester2021power}
+\citation{houlsby2019parameter}
+\citation{hu2022lora}
+\citation{bishop2006pattern}
+\citation{dempster1977maximum}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.4}Parameter-efficient fine-tuning}{4}{subsection.2.4}\protected@file@percent }
+\newlabel{sec:peft_background}{{2.4}{4}{Parameter-efficient fine-tuning}{subsection.2.4}{}}
+\newlabel{eq:lora}{{2}{4}{Parameter-efficient fine-tuning}{equation.2.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.5}Gaussian Mixture Models}{4}{subsection.2.5}\protected@file@percent }
+\newlabel{sec:gmm_background}{{2.5}{4}{Gaussian Mixture Models}{subsection.2.5}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces A two-component Gaussian Mixture Model. Each dashed curve is an individual component; the solid curve is their weighted sum. The mixture density is bimodal, whereas a single Gaussian would be forced to place mass between the two clusters.}}{4}{figure.1}\protected@file@percent }
+\newlabel{fig:gmm_illustration}{{1}{4}{A two-component Gaussian Mixture Model. Each dashed curve is an individual component; the solid curve is their weighted sum. The mixture density is bimodal, whereas a single Gaussian would be forced to place mass between the two clusters}{figure.1}{}}
+\newlabel{eq:gmm}{{3}{4}{Gaussian Mixture Models}{equation.2.3}{}}
+\newlabel{eq:logN}{{4}{4}{Gaussian Mixture Models}{equation.2.4}{}}
+\newlabel{eq:logpk}{{5}{4}{Gaussian Mixture Models}{equation.2.5}{}}
+\newlabel{eq:resp}{{6}{4}{Gaussian Mixture Models}{equation.2.6}{}}
+\newlabel{eq:var_update}{{8}{4}{Gaussian Mixture Models}{equation.2.8}{}}
+\citation{jacobs1991adaptive,jordan1994hierarchical,shazeer2017outrageously,fedus2022switch}
+\citation{yadav2023exploring}
+\citation{iyer2018mapping}
+\citation{lu2021codexglue}
+\citation{husain2019codesearchnet}
+\citation{tufano2019empirical}
+\citation{xu2025kodcode}
+\citation{prenner2023runbugrun}
+\citation{nguyen2023vault}
+\citation{zhu2022multilingual}
+\@writefile{loa}{\contentsline {algocf}{\numberline {1}{\ignorespaces Expectation-Maximization for a Diagonal GMM}}{5}{algocf.1}\protected@file@percent }
+\newlabel{alg:em_gmm}{{1}{5}{Gaussian Mixture Models}{algocf.1}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3}Data Collection and Preprocessing}{5}{section.3}\protected@file@percent }
+\newlabel{sec:data}{{3}{5}{Data Collection and Preprocessing}{section.3}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Data collection and preprocessing pipeline. Five sequential stages transform raw datasets from multiple diverse sources into clean, unified benchmark splits for both continual learning evaluation tracks.}}{5}{figure.2}\protected@file@percent }
+\newlabel{fig:pipeline_overview}{{2}{5}{Data collection and preprocessing pipeline. Five sequential stages transform raw datasets from multiple diverse sources into clean, unified benchmark splits for both continual learning evaluation tracks}{figure.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}The CodeTask benchmark}{5}{subsection.3.1}\protected@file@percent }
+\newlabel{sec:codetask_data}{{3.1}{5}{The CodeTask benchmark}{subsection.3.1}{}}
+\citation{wei2023magicoder}
+\citation{chai2024mceval}
+\citation{chai2024mceval}
+\citation{chen2021evaluating}
+\citation{austin2021program}
+\citation{cassano2023multipl}
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces The CodeTask benchmark used in the non-executable continual learning track.}}{6}{table.1}\protected@file@percent }
+\newlabel{tab:codetask_stats}{{1}{6}{The CodeTask benchmark used in the non-executable continual learning track}{table.1}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces The eight-task CodeTask continual learning sequence. Training data from earlier tasks are unavailable once the model advances past each task boundary. Node color indicates task type: blue for generation, orange for translation, green for summarization, purple for refinement.}}{6}{figure.3}\protected@file@percent }
+\newlabel{fig:codetask_sequence}{{3}{6}{The eight-task CodeTask continual learning sequence. Training data from earlier tasks are unavailable once the model advances past each task boundary. Node color indicates task type: blue for generation, orange for translation, green for summarization, purple for refinement}{figure.3}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Statistics of the executable benchmark subsets.}}{6}{table.2}\protected@file@percent }
+\newlabel{tab:exec_stats}{{2}{6}{Statistics of the executable benchmark subsets}{table.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}The executable benchmark and deduplication pipeline}{6}{subsection.3.2}\protected@file@percent }
+\newlabel{sec:exec_data}{{3.2}{6}{The executable benchmark and deduplication pipeline}{subsection.3.2}{}}
+\citation{nist2015securehash}
+\citation{broder1997resemblance}
+\citation{indyk1998approximate}
+\citation{jaccard1901distribution}
+\citation{hu2022lora}
+\@writefile{toc}{\contentsline {section}{\numberline {4}Methodology}{7}{section.4}\protected@file@percent }
+\newlabel{sec:methodology}{{4}{7}{Methodology}{section.4}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces Near-deduplication pipeline. Normalization and shingling produce set representations; MinHash enables approximate similarity estimation; LSH restricts the search space to candidate pairs; exact Jaccard scoring provides the final decision.}}{7}{figure.4}\protected@file@percent }
+\newlabel{fig:near_dedup}{{4}{7}{Near-deduplication pipeline. Normalization and shingling produce set representations; MinHash enables approximate similarity estimation; LSH restricts the search space to candidate pairs; exact Jaccard scoring provides the final decision}{figure.4}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Training task-specific experts}{8}{subsection.4.1}\protected@file@percent }
+\newlabel{sec:experts}{{4.1}{8}{Training task-specific experts}{subsection.4.1}{}}
+\newlabel{eq:task_loss}{{9}{8}{Training task-specific experts}{equation.4.9}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}Routing feature extraction}{8}{subsection.4.2}\protected@file@percent }
+\newlabel{sec:features}{{4.2}{8}{Routing feature extraction}{subsection.4.2}{}}
+\newlabel{eq:meanpool}{{10}{8}{Routing feature extraction}{equation.4.10}{}}
+\newlabel{eq:ln}{{11}{8}{Routing feature extraction}{equation.4.11}{}}
+\newlabel{eq:z}{{12}{8}{Routing feature extraction}{equation.4.12}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Continual GMM instruction router}{8}{subsection.4.3}\protected@file@percent }
+\newlabel{sec:router}{{4.3}{8}{Continual GMM instruction router}{subsection.4.3}{}}
+\newlabel{eq:snorm}{{13}{8}{Continual GMM instruction router}{equation.4.13}{}}
+\newlabel{eq:routing}{{14}{8}{Continual GMM instruction router}{equation.4.14}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.4}Soft routing and adapter merging}{8}{subsection.4.4}\protected@file@percent }
+\newlabel{sec:soft_routing}{{4.4}{8}{Soft routing and adapter merging}{subsection.4.4}{}}
+\newlabel{eq:alpha}{{15}{8}{Soft routing and adapter merging}{equation.4.15}{}}
+\newlabel{eq:weight_merge}{{16}{8}{Soft routing and adapter merging}{equation.4.16}{}}
+\citation{kullback1951information}
+\citation{lin1991divergence}
+\@writefile{loa}{\contentsline {algocf}{\numberline {2}{\ignorespaces Soft-Routing Expert-Mixture Generation}}{9}{algocf.2}\protected@file@percent }
+\newlabel{alg:generation}{{2}{9}{Soft routing and adapter merging}{algocf.2}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces Round-1 inference pipeline of GMM-Router. The frozen backbone maps input $x$ to routing embedding $\mathbf  {z}$ using layers $0$--$\ell ^*$. The router branch (purple) evaluates the $K$ GMM log-densities, adds the uniform log-prior, and converts scores to routing weights $\bm  {\alpha }(x)$. The expert branch (teal) merges the $K$ LoRA adapters as $\Delta W=\DOTSB \sum@ \slimits@ _k\alpha _k B_k A_k$ and generates output $\hat  {y}$.}}{9}{figure.5}\protected@file@percent }
+\newlabel{fig:arch}{{5}{9}{Round-1 inference pipeline of GMM-Router. The frozen backbone maps input $x$ to routing embedding $\mathbf {z}$ using layers $0$--$\ell ^*$. The router branch (purple) evaluates the $K$ GMM log-densities, adds the uniform log-prior, and converts scores to routing weights $\bm {\alpha }(x)$. The expert branch (teal) merges the $K$ LoRA adapters as $\Delta W=\sum _k\alpha _k B_k A_k$ and generates output $\hat {y}$}{figure.5}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.5}Iterative refinement for executable code generation}{9}{subsection.4.5}\protected@file@percent }
+\newlabel{sec:traceback}{{4.5}{9}{Iterative refinement for executable code generation}{subsection.4.5}{}}
+\newlabel{sec:round2}{{4.5}{9}{Iterative refinement for executable code generation}{subsection.4.5}{}}
+\newlabel{eq:jsd}{{17}{9}{Iterative refinement for executable code generation}{equation.4.17}{}}
+\newlabel{eq:jsd_gated}{{18}{9}{Iterative refinement for executable code generation}{equation.4.18}{}}
+\citation{hui2024qwen25coder}
+\citation{hu2022lora}
+\citation{kirkpatrick2017overcoming}
+\citation{wang2022learning}
+\citation{razdaibiedina2023progressive}
+\citation{wang2023orthogonal}
+\citation{cheng2025exploiting}
+\citation{qian2025treelora}
+\@writefile{toc}{\contentsline {section}{\numberline {5}Evaluation}{10}{section.5}\protected@file@percent }
+\newlabel{sec:evaluation}{{5}{10}{Evaluation}{section.5}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}Research questions}{10}{subsection.5.1}\protected@file@percent }
+\newlabel{sec:rqs}{{5.1}{10}{Research questions}{subsection.5.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Datasets}{10}{subsection.5.2}\protected@file@percent }
+\newlabel{sec:eval_datasets}{{5.2}{10}{Datasets}{subsection.5.2}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces Property comparison of baselines and GMM-Router. {\fontfamily  {pzd}\fontencoding  {U}\fontseries  {m}\fontshape  {n}\selectfont  \char 51}{} = has property; {\fontfamily  {pzd}\fontencoding  {U}\fontseries  {m}\fontshape  {n}\selectfont  \char 55}{} = lacks property. \textbf  {Back.} = backbone frozen; \textbf  {Isol.} = dedicated module per task; \textbf  {Agn.} = no task identity needed at inference; \textbf  {Repl.} = stores/replays raw data; \textbf  {Rout.} = routes via learned feature distributions; \textbf  {Shar.} = models cross-task parameter relationships; \textbf  {Reg.} = applies parameter regularization; \textbf  {Refine.} = iteratively refines failed predictions using execution feedback.}}{10}{table.3}\protected@file@percent }
+\newlabel{tab:method_comparison}{{3}{10}{Property comparison of baselines and GMM-Router. \ymark {} = has property; \xmark {} = lacks property. \textbf {Back.} = backbone frozen; \textbf {Isol.} = dedicated module per task; \textbf {Agn.} = no task identity needed at inference; \textbf {Repl.} = stores/replays raw data; \textbf {Rout.} = routes via learned feature distributions; \textbf {Shar.} = models cross-task parameter relationships; \textbf {Reg.} = applies parameter regularization; \textbf {Refine.} = iteratively refines failed predictions using execution feedback}{table.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}Configurations}{10}{subsection.5.3}\protected@file@percent }
+\newlabel{sec:setup}{{5.3}{10}{Configurations}{subsection.5.3}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {5.3.1}Base model and baselines}{10}{subsubsection.5.3.1}\protected@file@percent }
+\newlabel{sec:baselines}{{5.3.1}{10}{Base model and baselines}{subsubsection.5.3.1}{}}
+\citation{papineni2002bleu}
+\citation{ren2020codebleu}
+\citation{chen2021evaluating}
+\citation{wang2023comprehensive}
+\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces Hyperparameters of the instruction and traceback routers.}}{11}{table.4}\protected@file@percent }
+\newlabel{tab:router_comparison}{{4}{11}{Hyperparameters of the instruction and traceback routers}{table.4}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {5.3.2}Hyperparameters}{11}{subsubsection.5.3.2}\protected@file@percent }
+\newlabel{sec:hyperparams}{{5.3.2}{11}{Hyperparameters}{subsubsection.5.3.2}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {5.3.3}Evaluation metrics}{11}{subsubsection.5.3.3}\protected@file@percent }
+\newlabel{sec:metrics}{{5.3.3}{11}{Evaluation metrics}{subsubsection.5.3.3}{}}
+\newlabel{eq:bleu}{{19}{11}{Evaluation metrics}{equation.5.19}{}}
+\newlabel{eq:codebleu}{{20}{11}{Evaluation metrics}{equation.5.20}{}}
+\newlabel{eq:passk}{{21}{11}{Evaluation metrics}{equation.5.21}{}}
+\citation{lopezpaz2017gem}
+\newlabel{eq:fm}{{22}{12}{Evaluation metrics}{equation.5.22}{}}
+\newlabel{eq:bwt}{{23}{12}{Evaluation metrics}{equation.5.23}{}}
+\newlabel{eq:bwt_fwt}{{24}{12}{Evaluation metrics}{equation.5.24}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {6}Experimental Results}{12}{section.6}\protected@file@percent }
+\newlabel{sec:results}{{6}{12}{Experimental Results}{section.6}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.1}RQ1: Performance on the CodeTask benchmark}{12}{subsection.6.1}\protected@file@percent }
+\newlabel{sec:codetask_results}{{6.1}{12}{RQ1: Performance on the CodeTask benchmark}{subsection.6.1}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {5}{\ignorespaces Final results (\%) on the CodeTask benchmark (Qwen2.5-Coder-1.5B, $\tau =2.0$). LoRA per task is the upper bound (task identity known at inference).}}{12}{table.5}\protected@file@percent }
+\newlabel{tab:codetask_qwen}{{5}{12}{Final results (\%) on the CodeTask benchmark (Qwen2.5-Coder-1.5B, $\tau =2.0$). LoRA per task is the upper bound (task identity known at inference)}{table.5}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.2}RQ2: Performance on the executable benchmark}{12}{subsection.6.2}\protected@file@percent }
+\newlabel{sec:exec_results}{{6.2}{12}{RQ2: Performance on the executable benchmark}{subsection.6.2}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {6}{\ignorespaces Average Pass@1 and Pass@5 (\%) on the executable benchmark. LoRA per task is the upper bound (task identity known, without iterative refinement).}}{13}{table.6}\protected@file@percent }
+\newlabel{tab:exec_avg}{{6}{13}{Average Pass@1 and Pass@5 (\%) on the executable benchmark. LoRA per task is the upper bound (task identity known, without iterative refinement)}{table.6}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {7}{\ignorespaces Per-language Pass@1 (\%) on the executable benchmark ($\tau =1.0$).}}{13}{table.7}\protected@file@percent }
+\newlabel{tab:exec_p1}{{7}{13}{Per-language Pass@1 (\%) on the executable benchmark ($\tau =1.0$)}{table.7}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {6.2.1}Per-language analysis}{13}{subsubsection.6.2.1}\protected@file@percent }
+\newlabel{sec:perlang}{{6.2.1}{13}{Per-language analysis}{subsubsection.6.2.1}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {8}{\ignorespaces Per-language Pass@5 (\%) on the executable benchmark ($\tau =1.0$).}}{13}{table.8}\protected@file@percent }
+\newlabel{tab:exec_p5}{{8}{13}{Per-language Pass@5 (\%) on the executable benchmark ($\tau =1.0$)}{table.8}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.3}RQ3: Forgetting, transfer, and router assignment}{13}{subsection.6.3}\protected@file@percent }
+\newlabel{sec:rq3}{{6.3}{13}{RQ3: Forgetting, transfer, and router assignment}{subsection.6.3}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {6.3.1}Router assignment analysis}{13}{subsubsection.6.3.1}\protected@file@percent }
+\newlabel{sec:routing_analysis}{{6.3.1}{13}{Router assignment analysis}{subsubsection.6.3.1}{}}
+\@writefile{toc}{\contentsline {paragraph}{CodeTask benchmark.}{13}{section*.1}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {6}{\ignorespaces Hard-routing confusion matrix (\%) on the CodeTask benchmark at the final training step. Rows = true task; columns = assigned expert. Diagonal entries indicate correct routing; darker cells indicate higher routing weight.}}{14}{figure.6}\protected@file@percent }
+\newlabel{fig:confusion_codetask}{{6}{14}{Hard-routing confusion matrix (\%) on the CodeTask benchmark at the final training step. Rows = true task; columns = assigned expert. Diagonal entries indicate correct routing; darker cells indicate higher routing weight}{figure.6}{}}
+\@writefile{toc}{\contentsline {paragraph}{Executable benchmark.}{14}{section*.2}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {7}{\ignorespaces Hard-routing confusion matrix (\%) of the \emph  {instruction} router on the executable benchmark at the final training step. The C++ column dominates, collecting most mass from every language.}}{14}{figure.7}\protected@file@percent }
+\newlabel{fig:confusion_exec}{{7}{14}{Hard-routing confusion matrix (\%) of the \emph {instruction} router on the executable benchmark at the final training step. The C++ column dominates, collecting most mass from every language}{figure.7}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {6.3.2}Knowledge transfer and forgetting dynamics}{14}{subsubsection.6.3.2}\protected@file@percent }
+\newlabel{sec:forgetting}{{6.3.2}{14}{Knowledge transfer and forgetting dynamics}{subsubsection.6.3.2}{}}
+\@writefile{toc}{\contentsline {paragraph}{CodeTask benchmark.}{14}{section*.3}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {8}{\ignorespaces Hard-routing confusion matrix (\%) of the \emph  {traceback} router on the executable benchmark at the final training step. The strong diagonal contrasts sharply with Figure~\ref {fig:confusion_exec}.}}{15}{figure.8}\protected@file@percent }
+\newlabel{fig:confusion_tb}{{8}{15}{Hard-routing confusion matrix (\%) of the \emph {traceback} router on the executable benchmark at the final training step. The strong diagonal contrasts sharply with Figure~\ref {fig:confusion_exec}}{figure.8}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {9}{\ignorespaces BWT, FM, and FWT (\%) on the CodeTask benchmark. Negative BWT indicates net forgetting; lower FM is better; higher FWT indicates stronger in-task learning.}}{15}{table.9}\protected@file@percent }
+\newlabel{tab:bwt_codetask}{{9}{15}{BWT, FM, and FWT (\%) on the CodeTask benchmark. Negative BWT indicates net forgetting; lower FM is better; higher FWT indicates stronger in-task learning}{table.9}{}}
+\@writefile{toc}{\contentsline {paragraph}{Executable benchmark.}{15}{section*.4}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {9}{\ignorespaces Retained CONCODE score after each task in the CodeTask sequence. GMM-Router remains nearly flat ($36.39\%\to 35.06\%$); O-LoRA and SeqLoRA show severe drops with partial recovery; TreeLoRA suffers substantial catastrophic forgetting.}}{15}{figure.9}\protected@file@percent }
+\newlabel{fig:forgetting_concode}{{9}{15}{Retained CONCODE score after each task in the CodeTask sequence. GMM-Router remains nearly flat ($36.39\%\to 35.06\%$); O-LoRA and SeqLoRA show severe drops with partial recovery; TreeLoRA suffers substantial catastrophic forgetting}{figure.9}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {10}{\ignorespaces BWT, FM, and FWT (\%) on the executable benchmark. Positive BWT indicates backward enhancement; lower FM is better; higher FWT indicates stronger in-task learning.}}{16}{table.10}\protected@file@percent }
+\newlabel{tab:bwt_exec}{{10}{16}{BWT, FM, and FWT (\%) on the executable benchmark. Positive BWT indicates backward enhancement; lower FM is better; higher FWT indicates stronger in-task learning}{table.10}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {11}{\ignorespaces Ablation of Round-2 pipeline components on the executable benchmark. Best averages in bold.}}{16}{table.11}\protected@file@percent }
+\newlabel{tab:ablation_refinement}{{11}{16}{Ablation of Round-2 pipeline components on the executable benchmark. Best averages in bold}{table.11}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {12}{\ignorespaces Round-2 coverage and lift per language at the final training step. Languages sorted by lift, descending.}}{16}{table.12}\protected@file@percent }
+\newlabel{tab:r2_lang}{{12}{16}{Round-2 coverage and lift per language at the final training step. Languages sorted by lift, descending}{table.12}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.4}RQ4: Iterative refinement}{16}{subsection.6.4}\protected@file@percent }
+\newlabel{sec:refinement}{{6.4}{16}{RQ4: Iterative refinement}{subsection.6.4}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {13}{\ignorespaces Average Pass@1/Pass@5 (\%) under four Round-2 routing strategies (original adapters).}}{16}{table.13}\protected@file@percent }
+\newlabel{tab:jsd_summary}{{13}{16}{Average Pass@1/Pass@5 (\%) under four Round-2 routing strategies (original adapters)}{table.13}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.5}Discussion}{16}{subsection.6.5}\protected@file@percent }
+\newlabel{sec:discussion}{{6.5}{16}{Discussion}{subsection.6.5}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {6.5.1}Cross-benchmark comparison}{16}{subsubsection.6.5.1}\protected@file@percent }
+\newlabel{sec:crossbench}{{6.5.1}{16}{Cross-benchmark comparison}{subsubsection.6.5.1}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {10}{\ignorespaces CodeTask average (\%) vs.\ executable average Pass@1 (\%) for each method. LoRA per task is the upper bound. Methods in the upper-right corner are preferred; methods that trade one benchmark for the other appear off-diagonal.}}{17}{figure.10}\protected@file@percent }
+\newlabel{fig:method_comparison}{{10}{17}{CodeTask average (\%) vs.\ executable average Pass@1 (\%) for each method. LoRA per task is the upper bound. Methods in the upper-right corner are preferred; methods that trade one benchmark for the other appear off-diagonal}{figure.10}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {6.5.2}Qualitative example: Round-2 recovery via traceback routing}{17}{subsubsection.6.5.2}\protected@file@percent }
+\newlabel{sec:error_analysis}{{6.5.2}{17}{Qualitative example: Round-2 recovery via traceback routing}{subsubsection.6.5.2}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {11}{\ignorespaces Round-2 routing weights $\alpha _k$ after traceback-GMM redistribution for the example in Section~\ref {sec:error_analysis}. The Rust expert rises from $0$ to $0.384$; the remaining weight spreads approximately evenly across the other eight experts.}}{17}{figure.11}\protected@file@percent }
+\newlabel{fig:case_routing}{{11}{17}{Round-2 routing weights $\alpha _k$ after traceback-GMM redistribution for the example in Section~\ref {sec:error_analysis}. The Rust expert rises from $0$ to $0.384$; the remaining weight spreads approximately evenly across the other eight experts}{figure.11}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {6.5.3}Limitations and threats to validity}{17}{subsubsection.6.5.3}\protected@file@percent }
+\newlabel{sec:limitations}{{6.5.3}{17}{Limitations and threats to validity}{subsubsection.6.5.3}{}}
+\citation{kirkpatrick2017overcoming}
+\citation{li2017learning}
+\citation{zenke2017continual}
+\citation{aljundi2018memory}
+\citation{lopezpaz2017gem,chaudhry2019agem}
+\citation{buzzega2020dark}
+\citation{shin2017continual}
+\citation{rusu2016progressive,mallya2018packnet,serra2018overcoming}
+\citation{wang2022learning}
+\citation{razdaibiedina2023progressive}
+\citation{hu2022lora}
+\citation{wang2023orthogonal}
+\citation{wang2025continual}
+\citation{qian2025treelora}
+\citation{wistuba2023continual}
+\citation{zhang2025clora}
+\citation{he2025cllora}
+\citation{cheng2025exploiting}
+\@writefile{toc}{\contentsline {section}{\numberline {7}Related Work}{18}{section.7}\protected@file@percent }
+\newlabel{sec:related_work}{{7}{18}{Related Work}{section.7}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.1}Continual learning methods}{18}{subsection.7.1}\protected@file@percent }
+\newlabel{sec:rw_cl}{{7.1}{18}{Continual learning methods}{subsection.7.1}{}}
+\citation{jacobs1991adaptive}
+\citation{jordan1994hierarchical}
+\citation{shazeer2017outrageously}
+\citation{fedus2022switch}
+\citation{feng2020codebert,guo2021graphcodebert,guo2022unixcoder,ahmad2021plbart,wang2021codet5,wang2023codet5plus,fried2023incoder,roziere2023codellama,lozhkov2024starcoder2,hui2024qwen25coder}
+\citation{yadav2023exploring}
+\citation{papineni2002bleu}
+\citation{ren2020codebleu}
+\citation{chen2021evaluating}
+\citation{cassano2023multipl}
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.2}Mixture of experts and density-based routing}{19}{subsection.7.2}\protected@file@percent }
+\newlabel{sec:rw_moe}{{7.2}{19}{Mixture of experts and density-based routing}{subsection.7.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.3}Code language models and evaluation}{19}{subsection.7.3}\protected@file@percent }
+\newlabel{sec:rw_code}{{7.3}{19}{Code language models and evaluation}{subsection.7.3}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {8}Conclusion and Future Work}{19}{section.8}\protected@file@percent }
+\newlabel{sec:conclusion}{{8}{19}{Conclusion and Future Work}{section.8}{}}
+\bibstyle{cas-model2-names}
+\bibdata{refs}
+\bibcite{ahmad2021plbart}{{1}{2021}{{Ahmad et~al.}}{{Ahmad, Chakraborty, Ray and Chang}}}
+\bibcite{aljundi2018memory}{{2}{2018}{{Aljundi et~al.}}{{Aljundi, Babiloni, Elhoseiny, Rohrbach and Tuytelaars}}}
+\bibcite{austin2021program}{{3}{2021}{{Austin et~al.}}{{Austin, Odena, Nye, Bosma, Michalewski, Dohan, Jiang, Cai, Terry, Le et~al.}}}
+\bibcite{bishop2006pattern}{{4}{2006}{{Bishop}}{{}}}
+\bibcite{broder1997resemblance}{{5}{1997}{{Broder}}{{}}}
+\bibcite{buzzega2020dark}{{6}{2020}{{Buzzega et~al.}}{{Buzzega, Boschini, Porrello, Abati and Calderara}}}
+\bibcite{cassano2023multipl}{{7}{2023}{{Cassano et~al.}}{{Cassano, Gouwar, Nguyen, Nguyen, Phipps-Costin, Pinckney, Yee, Zi, Anderson, Feldman et~al.}}}
+\bibcite{chai2024mceval}{{8}{2025}{{Chai et~al.}}{{Chai, Liu, Yang, Yin, Jin, Liu, Sun, Zhang, Ren, Guo, Wang, Wang, Wu, Wang, Li, Yang, Duan and Li}}}
+\bibcite{chaudhry2019agem}{{9}{2019}{{Chaudhry et~al.}}{{Chaudhry, Ranzato, Rohrbach and Elhoseiny}}}
+\bibcite{chen2021evaluating}{{10}{2021}{{Chen et~al.}}{{Chen, Tworek, Jun, Yuan, Pinto, Kaplan, Edwards, Burda, Joseph, Brockman et~al.}}}
+\bibcite{cheng2025exploiting}{{11}{2025}{{Cheng et~al.}}{{Cheng, Ye, Xu, Yan, Zhang, Liu, Huang and Feng}}}
+\bibcite{delange2021continual}{{12}{2021}{{De~Lange et~al.}}{{De~Lange, Aljundi, Masana, Parisot, Jia, Leonardis, Slabaugh and Tuytelaars}}}
+\bibcite{dempster1977maximum}{{13}{1977}{{Dempster et~al.}}{{Dempster, Laird and Rubin}}}
+\bibcite{fedus2022switch}{{14}{2022}{{Fedus et~al.}}{{Fedus, Zoph and Shazeer}}}
+\bibcite{feng2020codebert}{{15}{2020}{{Feng et~al.}}{{Feng, Guo, Tang, Duan, Feng, Gong, Shou, Qin, Liu, Jiang and Zhou}}}
+\bibcite{fried2023incoder}{{16}{2023}{{Fried et~al.}}{{Fried, Aghajanyan, Lin, Wang, Wallace, Shi, Zhong, Yih, Zettlemoyer and Lewis}}}
+\bibcite{goodfellow2013empirical}{{17}{2013}{{Goodfellow et~al.}}{{Goodfellow, Mirza, Xiao, Courville and Bengio}}}
+\bibcite{guo2022unixcoder}{{18}{2022}{{Guo et~al.}}{{Guo, Lu, Duan, Wang, Zhou and Yin}}}
+\bibcite{guo2021graphcodebert}{{19}{2021}{{Guo et~al.}}{{Guo, Ren, Lu, Feng, Tang, Liu, Zhou, Duan, Svyatkovskiy, Fu et~al.}}}
+\bibcite{he2025cllora}{{20}{2025}{{He et~al.}}{{He, Duan and Zhu}}}
+\bibcite{houlsby2019parameter}{{21}{2019}{{Houlsby et~al.}}{{Houlsby, Giurgiu, Jastrzebski, Morrone, De~Laroussilhe, Gesmundo, Attariyan and Gelly}}}
+\bibcite{hu2022lora}{{22}{2022}{{Hu et~al.}}{{Hu, Shen, Wallis, Allen-Zhu, Li, Wang, Wang and Chen}}}
+\bibcite{hui2024qwen25coder}{{23}{2024}{{Hui et~al.}}{{Hui, Yang, Cui, Yang, Liu, Zhang, Liu, Zhang, Yu, Lu et~al.}}}
+\bibcite{husain2019codesearchnet}{{24}{2019}{{Husain et~al.}}{{Husain, Wu, Gazit, Allamanis and Brockschmidt}}}
+\bibcite{indyk1998approximate}{{25}{1998}{{Indyk and Motwani}}{{}}}
+\bibcite{iyer2018mapping}{{26}{2018}{{Iyer et~al.}}{{Iyer, Konstas, Cheung and Zettlemoyer}}}
+\bibcite{jaccard1901distribution}{{27}{1901}{{Jaccard}}{{}}}
+\bibcite{jacobs1991adaptive}{{28}{1991}{{Jacobs et~al.}}{{Jacobs, Jordan, Nowlan and Hinton}}}
+\bibcite{jordan1994hierarchical}{{29}{1994}{{Jordan and Jacobs}}{{}}}
+\bibcite{kirkpatrick2017overcoming}{{30}{2017}{{Kirkpatrick et~al.}}{{Kirkpatrick, Pascanu, Rabinowitz, Veness, Desjardins, Rusu, Milan, Quan, Ramalho, Grabska-Barwinska et~al.}}}
+\bibcite{kullback1951information}{{31}{1951}{{Kullback and Leibler}}{{}}}
+\bibcite{lester2021power}{{32}{2021}{{Lester et~al.}}{{Lester, Al-Rfou and Constant}}}
+\bibcite{li2017learning}{{33}{2017}{{Li and Hoiem}}{{}}}
+\bibcite{lin1991divergence}{{34}{1991}{{Lin}}{{}}}
+\bibcite{lopezpaz2017gem}{{35}{2017}{{Lopez-Paz and Ranzato}}{{}}}
+\bibcite{lozhkov2024starcoder2}{{36}{2024}{{Lozhkov et~al.}}{{Lozhkov, Li, Ben~Allal, Cassano, Lamy-Poirier, Tazi, Tang, Pykhtar, Liu, Wei et~al.}}}
+\bibcite{lu2021codexglue}{{37}{2021}{{Lu et~al.}}{{Lu, Guo, Ren, Huang, Svyatkovskiy, Blanco, Clement, Drain, Jiang, Tang, Li, Zhou, Shou, Zhou, Tufano, Gong, Zhou, Duan, Sundaresan, Deng, Fu and Liu}}}
+\bibcite{mallya2018packnet}{{38}{2018}{{Mallya and Lazebnik}}{{}}}
+\bibcite{mccloskey1989catastrophic}{{39}{1989}{{McCloskey and Cohen}}{{}}}
+\bibcite{nist2015securehash}{{40}{2015}{{National Institute of Standards and Technology}}{{}}}
+\bibcite{nguyen2023vault}{{41}{2023}{{Nguyen et~al.}}{{Nguyen, Le, Dau, Nguyen, Nghiem, Guo and Bui}}}
+\bibcite{papineni2002bleu}{{42}{2002}{{Papineni et~al.}}{{Papineni, Roukos, Ward and Zhu}}}
+\bibcite{parisi2019continual}{{43}{2019}{{Parisi et~al.}}{{Parisi, Kemker, Part, Kanan and Wermter}}}
+\bibcite{prenner2023runbugrun}{{44}{2023}{{Prenner and Robbes}}{{}}}
+\bibcite{qian2025treelora}{{45}{2025}{{Qian et~al.}}{{Qian, Gao, Ding, Zhou, Liang, Duan, Liu, Zhao and Tang}}}
+\bibcite{razdaibiedina2023progressive}{{46}{2023}{{Razdaibiedina et~al.}}{{Razdaibiedina, Mao, Hou, Khabsa, Lewis and Almahairi}}}
+\bibcite{ren2020codebleu}{{47}{2020}{{Ren et~al.}}{{Ren, Guo, Lu, Zhou, Liu, Tang, Sundaresan, Zhou, Blanco and Ma}}}
+\bibcite{roziere2023codellama}{{48}{2023}{{Rozi{`e}re et~al.}}{{Rozi{`e}re, Gehring, Gloeckle, Sootla, Gat, Tan, Adi, Liu, Sauvestre, Remez et~al.}}}
+\bibcite{rusu2016progressive}{{49}{2016}{{Rusu et~al.}}{{Rusu, Rabinowitz, Desjardins, Soyer, Kirkpatrick, Kavukcuoglu, Pascanu and Hadsell}}}
+\bibcite{serra2018overcoming}{{50}{2018}{{Serr{`a} et~al.}}{{Serr{`a}, Suris, Miron and Karatzoglou}}}
+\bibcite{shazeer2017outrageously}{{51}{2017}{{Shazeer et~al.}}{{Shazeer, Mirhoseini, Maziarz, Davis, Le, Hinton and Dean}}}
+\bibcite{shin2017continual}{{52}{2017}{{Shin et~al.}}{{Shin, Lee, Kim and Kim}}}
+\bibcite{tufano2019empirical}{{53}{2019}{{Tufano et~al.}}{{Tufano, Watson, Bavota, Di~Penta, White and Poshyvanyk}}}
+\bibcite{vaswani2017attention}{{54}{2017}{{Vaswani et~al.}}{{Vaswani, Shazeer, Parmar, Uszkoreit, Jones, Gomez, Kaiser and Polosukhin}}}
+\bibcite{wang2025continual}{{55}{2025}{{Wang et~al.}}{{Wang, Lyu, Sun and Jing}}}
+\bibcite{wang2023comprehensive}{{56}{2023a}{{Wang et~al.}}{{Wang, Zhang, Su and Zhu}}}
+\bibcite{wang2023orthogonal}{{57}{2023b}{{Wang et~al.}}{{Wang, Chen, Ge, Xia, Bao, Zheng, Zhang, Gui and Huang}}}
+\bibcite{wang2023codet5plus}{{58}{2023c}{{Wang et~al.}}{{Wang, Le, Gotmare, Bui, Li and Hoi}}}
+\bibcite{wang2021codet5}{{59}{2021}{{Wang et~al.}}{{Wang, Wang, Joty and Hoi}}}
+\bibcite{wang2022learning}{{60}{2022}{{Wang et~al.}}{{Wang, Zhang, Ebrahimi, Sun, Zhang, Lee, Ren, Su, Perot, Dy and Pfister}}}
+\bibcite{wei2023magicoder}{{61}{2023}{{Wei et~al.}}{{Wei, Wang, Liu, Ding and Zhang}}}
+\bibcite{wistuba2023continual}{{62}{2023}{{Wistuba et~al.}}{{Wistuba, Sivaprasad, Balles and Zappella}}}
+\bibcite{xu2025kodcode}{{63}{2025}{{Xu et~al.}}{{Xu, Liu, Yin, Zhou and Poovendran}}}
+\bibcite{yadav2023exploring}{{64}{2023}{{Yadav et~al.}}{{Yadav, Sun, Ding, Li, Zhang, Tan, Ma, Bhatia, Nallapati, Ramanathan, Bansal and Xiang}}}
+\bibcite{zenke2017continual}{{65}{2017}{{Zenke et~al.}}{{Zenke, Poole and Ganguli}}}
+\bibcite{zhang2025clora}{{66}{2025}{{Zhang et~al.}}{{Zhang, Bai, Yang and Liang}}}
+\bibcite{zhu2022multilingual}{{67}{2022}{{Zhu et~al.}}{{Zhu, Suresh, Korotkova, Aghajanyan, O'Gorman, Iyyer and Reddy}}}
+\csxdef{lastpage}{22}
+\gdef \@abspage@last{23}

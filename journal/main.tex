@@ -1,0 +1,151 @@
+%%
+%% Journal of Systems and Software submission
+%% Built from the cas-dc (double column) Elsevier template.
+%%
+\documentclass[a4paper,fleqn]{cas-dc}
+
+\usepackage[authoryear,longnamesfirst]{natbib}
+
+% Ensure any Computer Modern fallback glyphs (e.g. accented author names in
+% the bibliography) use scalable Latin Modern Type1 outlines instead of
+% triggering on-the-fly Metafont bitmap generation.
+\usepackage{lmodern}
+
+% ---------------------------------------------------------------------------
+% Additional packages needed for figures, algorithms and code listings.
+% (graphicx, amsmath/amsfonts/amssymb, booktabs, multirow, array, colortbl,
+%  xcolor and hyperref are already loaded by cas-dc.cls.)
+% ---------------------------------------------------------------------------
+\usepackage{bm}
+\usepackage{pifont}
+\newcommand{\ymark}{\ding{51}}
+\newcommand{\xmark}{\ding{55}}
+
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,calc,fit,backgrounds,shapes.geometric,decorations.pathreplacing}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\definecolor{heatblue}{RGB}{33,113,181}
+\newcommand{\CTcs}{0.85}
+\newcommand{\EXcs}{0.78}
+
+\usepackage[ruled,vlined]{algorithm2e}
+\usepackage{listings}
+\lstdefinestyle{codebox}{
+  frame=single,
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  basicstyle=\ttfamily\scriptsize,
+  columns=fullflexible,
+  breaklines=true,
+  keepspaces=true,
+  keywordstyle=\color{blue!70}\bfseries,
+  commentstyle=\color{green!50!black}\itshape,
+  stringstyle=\color{orange!80!black},
+}
+\lstdefinestyle{errorbox}{
+  frame=single,
+  basicstyle=\ttfamily\scriptsize,
+  backgroundcolor=\color{red!6},
+  columns=fullflexible,
+  breaklines=true,
+  keepspaces=true,
+}
+\lstdefinestyle{taskbox}{
+  frame=single,
+  basicstyle=\ttfamily\scriptsize,
+  backgroundcolor=\color{blue!4},
+  columns=fullflexible,
+  breaklines=true,
+  keepspaces=true,
+}
+\lstdefinelanguage{Rust}{
+  keywords={fn,let,mut,if,for,in,return,true,false,struct,impl,
+             pub,use,mod,where,match,enum,loop,while,break,self},
+  sensitive=true,
+  morecomment=[l]{//},
+  morecomment=[s]{/*}{*/},
+  morestring=[b]",
+}
+
+\graphicspath{{figs/}}
+
+\begin{document}
+\let\WriteBookmarks\relax
+\def\floatpagepagefraction{1}
+\def\textpagefraction{.001}
+
+% Short title
+\shorttitle{GMM-Router for Continual Code Generation}
+
+% Short author
+\shortauthors{Tran An Khanh}
+
+% Main title of the paper
+\title[mode=title]{GMM-Router: Density-Based Task-Agnostic Routing for Continual Code Generation}
+
+% First author
+\author[1]{Tran An Khanh}
+\cormark[1]
+\ead{TODO@example.edu} % TODO: insert corresponding author email
+\credit{Conceptualization, Methodology, Software, Data curation, Investigation, Writing -- original draft}
+
+\affiliation[1]{organization={School of Information and Communication Technology, Hanoi University of Science and Technology},
+            addressline={TODO}, % TODO: insert street address
+            city={Hanoi},
+            postcode={TODO}, % TODO: insert postcode
+            state={},
+            country={Vietnam}}
+
+\cortext[1]{Corresponding author}
+
+% Here goes the abstract
+\begin{abstract}
+Code language models deployed in practice must adapt continuously to new programming languages, task types, and coding standards, which gives rise to continual learning for code generation: a model is trained on a sequence of tasks but risks catastrophic forgetting of earlier ones. Existing approaches rely on parameter regularization, prompt tuning, or data replay, each of which struggles with structurally diverse task streams, offers limited expressive capacity, or raises data-retention concerns. This paper studies whether routing can avoid these limitations without task identity at inference. We propose GMM-Router, which trains a task-specific low-rank adaptation (LoRA) expert per task while a diagonal Gaussian Mixture Model (GMM), fitted by Expectation-Maximization over frozen, orthonormally projected backbone representations, provides task-agnostic scores that merge expert adapters via a temperature-scaled softmax. For executable code generation, an iterative refinement stage fits a second GMM on runtime error tracebacks and combines it with the instruction router through a Jensen--Shannon-divergence-gated rule to re-predict samples that fail on the first attempt. GMM-Router is evaluated on two complementary benchmarks: an eight-task extension of CodeTask-CL scored by text-overlap metrics, and a nine-language executable benchmark scored by unit-test execution. On the diverse CodeTask sequence, GMM-Router attains the highest average score (51.62\%) among all task-agnostic baselines, with near-zero backward transfer ($-1.01\%$). On the executable benchmark, it reaches 34.40\% Pass@1 and the highest Pass@5 (47.75\%) among all evaluated methods. These results indicate that combining architectural expert isolation with density-based probabilistic routing is an effective, practical strategy for task-agnostic continual code generation.
+\end{abstract}
+
+% Research highlights
+\begin{highlights}
+\item GMM-Router routes inputs to per-task LoRA experts via frozen-backbone GMM scores.
+\item A fixed orthonormal projection keeps the routing space stable as tasks accumulate.
+\item Highest score (51.62\%) among task-agnostic methods on an 8-task CodeTask benchmark.
+\item Highest Pass@5 (47.75\%) on a 9-language executable code generation benchmark.
+\item JSD-gated traceback routing recovers samples that fail every Round-1 candidate.
+\end{highlights}
+
+% Keywords
+\begin{keywords}
+continual learning \sep code generation \sep parameter-efficient fine-tuning \sep Gaussian mixture model \sep mixture of experts \sep catastrophic forgetting \sep large language models for code
+\end{keywords}
+
+\maketitle
+
+\input{sections/introduction}
+\input{sections/background}
+\input{sections/data}
+\input{sections/methodology}
+\input{sections/evaluation}
+\input{sections/results}
+\input{sections/related_work}
+\input{sections/conclusion}
+
+\section*{Acknowledgments}
+The author thanks Dr.\ Ngo Van Linh for supervision and feedback throughout this work, and Le Hai Nam for guidance on the direction and technical execution of the research. The author also thanks Nguyen Minh Tung and Cao Van Dong of the Foundation Models group at BKAI Laboratory for discussions and suggestions that improved this work, and Hanoi University of Science and Technology for the academic environment and computational resources that made this research possible.
+
+\section*{Funding}
+TODO: insert funding source or a statement that no specific funding was received.
+
+\section*{Declaration of competing interest}
+TODO: insert competing-interest declaration.
+
+\section*{Data availability}
+TODO: insert links to the released CodeTask extension, the executable benchmark splits, and the code implementing GMM-Router, or a statement of the conditions under which they will be made available.
+
+\section*{Declaration of generative AI and AI-assisted technologies in the writing process}
+During the preparation of this work, the author used an AI coding assistant (Claude, Anthropic) to help restructure and condense prior thesis material into this manuscript's Journal of Systems and Software format. The author reviewed and edited the resulting material and takes full responsibility for the content of the publication.
+
+% Uncomment and use the natbib style already configured above.
+\bibliographystyle{cas-model2-names}
+\bibliography{refs}
+
+\end{document}

@@ -1,0 +1,12 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{stix}[2026/07/31 local no-op shadow]
+% Local shadow of the system stix.sty. cas-dc.cls conditionally loads STIX
+% math fonts when stix.sty is found on the compiling machine's TeX Live;
+% that conflicts with \usepackage{lmodern} in main.tex over the math
+% symbol/extension font families, corrupting big delimiters and \ldots.
+% Shadowing with an empty package here (found first, since the current
+% directory is searched before the system tree) keeps the class on its
+% CMR/Latin Modern fallback everywhere, regardless of what the compiling
+% machine has installed.
+\DeclareOption*{}
+\ProcessOptions\relax
