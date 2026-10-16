@@ -24,11 +24,15 @@ CGR is the thesis GMM-Router with three changes:
 
 The cluster runs CUDA 12.6. `requirements.txt` pins `torch==2.1.0`, which has no CUDA 12.6 build. So install PyTorch 2.6.0 built for CUDA 12.6 first, then install the remaining requirements with the torch line removed. `requirements.txt` is UTF-16 encoded, hence the `iconv`.
 
+The install also pins `pyarrow==23.0.1`. `requirements.txt` pins `numpy==1.25.2` but leaves pyarrow unpinned, and pip then installs a newer pyarrow that fails at import with `pyarrow requires NumPy 2.0 or newer`. pyarrow does not declare numpy as a dependency, so pip does not catch the clash. numpy 1.25.2, pyarrow 23.0.1 and datasets 2.14.7 together load the CodeTask data correctly.
+
 ```bash
 conda create -n cgr python=3.11 -y && conda activate cgr
 pip install torch==2.6.0 --index-url https://download.pytorch.org/whl/cu126
-iconv -f UTF-16 -t UTF-8 requirements.txt | grep -v '^torch==' > /tmp/requirements-cgr.txt
+{ iconv -f UTF-16 -t UTF-8 requirements.txt | grep -v '^torch=='; echo 'pyarrow==23.0.1'; } > /tmp/requirements-cgr.txt
 pip install -r /tmp/requirements-cgr.txt # transformers 4.47.1, datasets, scipy, safetensors, tree-sitter (CodeBLEU), ...
+python -c "import numpy, pyarrow, datasets; print(numpy.__version__, pyarrow.__version__, datasets.__version__)"
+# expected: 1.25.2 23.0.1 2.14.7
 python -c "import torch; print(torch.__version__, torch.version.cuda, torch.cuda.is_available(), torch.cuda.device_count())"
 # expected: 2.6.0+cu126 12.6 True 7
 export HF_HOME=./.cache HF_DATASETS_CACHE=./.cache

@@ -264,6 +264,17 @@ class T10Determinism(unittest.TestCase):
             self.assertTrue(torch.equal(a, b))
 
 
+class Environment(unittest.TestCase):
+    """Install check: every third-party module a real run imports (data loading, router, checkpoints, scoring)."""
+
+    def test_imports(self):
+        import datasets  # noqa: F401  (pulls in pyarrow; fails if pyarrow needs a newer numpy)
+        import pyarrow  # noqa: F401
+        import safetensors.torch  # noqa: F401
+        import scipy.linalg  # noqa: F401
+        from evaluator.compute_metrics import compute_metrics  # noqa: F401  (BLEU/CodeBLEU, tree-sitter)
+
+
 class OOMFallback(unittest.TestCase):
     """Shared GPUs: on CUDA OOM, training halves the micro-batch (same gradient) and generation splits the batch."""
 
